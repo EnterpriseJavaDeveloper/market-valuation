@@ -36,11 +36,6 @@ class FairMarketValueService:
         max_calculated_price = regression_data.intercept + (regression_data.treasury_coef * stock_data.treasury_yield) \
                                + (regression_data.dividend_coef * dividend) + (
                                            regression_data.earnings_coef * max_future_earnings)
-        # current_app.logger.info(f'Actual price: {stock_quote_data.open}\t'
-        #                 f'Fair Price from PE Calculated Earnings: {calculated_price}\t'
-        #                 f'Future Price: {future_calculated_price}\t'
-        #                 f'Blended Price: {blended_calculated_price}\t'
-        #                 f'Max Price: {max_calculated_price}')
         valued = cls.value_calculation(stock_quote_data.open, calculated_price)
         current_earnings_model = StockEarningsModel(earnings, "Trailing earnings", calculated_price, valued["valued"], valued["diff"])
         current_app.logger.info(f'Using calculated_price {calculated_price}: Market is {valued["valued"]} by: {valued["diff"]}%')

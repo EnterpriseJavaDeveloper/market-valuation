@@ -9,13 +9,18 @@ from flask import Flask, render_template
 from flask_apscheduler import APScheduler
 from flask.logging import default_handler
 
+from sqlalchemy import create_engine, text, select, func, and_
+from sqlalchemy.orm import Session
 
 from FairMarketValueService import FairMarketValueService
 # from flask_socketio import SocketIO, emit
-# from flask_cors import CORS, cross_origin
+from flask_cors import CORS, cross_origin
 
 from MarketValueService import MarketValueService
+from RegressionData import RegressionData
 from ShillerDataService import ShillerDataService
+import collections
+collections.Iterable = collections.abc.Iterable
 
 SP_500 = 'SP500'
 FUTURE_EARNINGS = 'FUTUREEARNINGS'
@@ -23,7 +28,8 @@ MARKETDATA = 'MARKETDATA'
 SP_QUOTE = 'SP500QUOTE'
 SP_QUOTE_CALCULATED = 'SP500QUOTECALCULATED'
 
-app = Flask(__name__, template_folder='templates/')
+app = Flask(__name__)
+
 root = logging.getLogger()
 root.addHandler(default_handler)
 
@@ -35,7 +41,9 @@ scheduler.start()
 app.config['SECRET_KEY'] = 'secret!'
 app.config['CORS_HEADERS'] = 'Content-Type'
 app.logger.setLevel(logging.INFO)
-
+engine = create_engine("postgresql+psycopg2://postgres:clouds58@localhost/MarketValuationDB")
+with engine.connect() as conn:
+    result = conn.execution_options(stream_results=True).execute(text("select * from earnings"))
 # socketio = SocketIO(app)
 conn = pg.connect(
     host="localhost",
@@ -121,18 +129,22 @@ def initialize_shiller_data():
     shiller_data_service = ShillerDataService()
     shiller_data_service.download_shiller_data()
     regression_data = shiller_data_service.get_regression_data()
-
-    coefficient_count = conn.run("select count(*) from coefficients c where c.treasury=:treasury"
-                                 " and  c.dividend=:dividend and c.earnings=earnings",
-                                 treasury=regression_data.treasury_coef, dividend=regression_data.dividend_coef,
-                                 earnings=regression_data.earnings_coef)
-    if coefficient_count[0] == [0]:
-        conn.run("START TRANSACTION")
-        conn.run("Insert into coefficients (intercept, dividend, earnings, treasury) "
-                 "values (:intercept, :dividend, :earnings, :treasury)",
-                 intercept=regression_data.intercept, dividend=regression_data.dividend_coef,
-                 earnings=regression_data.earnings_coef, treasury=regression_data.treasury_coef)
-        conn.commit()
+    session = Session(engine)
+    query = session.query(RegressionData)
+    query = query.filter(
+        and_(
+            RegressionData.treasury_coef == regression_data.treasury_coef,
+            RegressionData.dividend_coef == regression_data.dividend_coef,
+            RegressionData.earnings_coef == regression_data.earnings_coef
+        )
+    )
+    query = query.with_entities(func.count())
+    coefficient_count = query.scalar()
+    if coefficient_count == 0:
+        regression_values = RegressionData("S&P 500", regression_data.intercept, regression_data.dividend_coef,
+                                           regression_data.earnings_coef, regression_data.treasury_coef)
+        session.add(regression_values)
+        session.commit()
     return regression_data
 
 
@@ -146,6 +158,7 @@ with app.app_context():
 
 # http://127.0.0.1:5000/sp-data
 @app.route('/sp-data')
+@cross_origin()
 def get_stock_data():
     dictionary = collections.OrderedDict()
     dictionary['stock_valuation'] = calculate_fair_market_value()
