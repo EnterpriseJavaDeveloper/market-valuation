@@ -1,3 +1,4 @@
+import json
 import os
 import urllib
 import pandas as pd
@@ -30,9 +31,10 @@ class ShillerDataService:
         treasury_coef = mlr.coef_[2]
         dividend_coef = mlr.coef_[0]
         earnings_coef = mlr.coef_[1]
+        price_fairvalue = cls.shiller_df[['Date', 'Price', 'FairValue', 'Dividend', 'Earnings', 'Rate GS10']]
+        price_fairvalue = price_fairvalue.rename(str.lower, axis='columns')
         regression_data = RegressionData('SP_500', mlr.intercept_, dividend_coef, earnings_coef, treasury_coef,
-                                         cls.shiller_df[['Date', 'Price', 'FairValue']])
+                                         price_fairvalue)
 
-        # print("Creating Pickle File")
         pickle.dump(regression_data, open('ml_model.pkl', 'wb'))
         return regression_data

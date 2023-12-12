@@ -165,8 +165,6 @@ def get_stock_data():
     dictionary['market_data'] = app.cache.get(MARKETDATA)
     dictionary['market_quote'] = app.cache.get(SP_QUOTE)
     dictionary['equation_coefficients'] = app.cache.get(SP_500)
-    # stock_valuation = calculate_fair_market_value()
-    # print(stock_valuation.calculated_price)
     return json.dumps(dictionary, indent=4)
 
 

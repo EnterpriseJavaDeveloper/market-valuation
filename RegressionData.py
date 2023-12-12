@@ -1,3 +1,5 @@
+import json
+
 from simplestr import gen_str, gen_repr, gen_eq
 from sqlalchemy import Float, String
 from sqlalchemy.orm import Mapped, mapped_column
@@ -27,5 +29,8 @@ class RegressionData(dict, Base):
         self.treasury_coef = treasury_coef
         self.price_fairvalue = price_fairvalue
         if price_fairvalue is not None:
-            dict.__init__(self, name=name, intercept=intercept, dividend_coef=dividend_coef, earnings_coef=earnings_coef, treasury_coef=treasury_coef, price_fairvalue=price_fairvalue.to_json(orient='table', index=False))
+            history = price_fairvalue.to_json(orient='records')
+            history = history.replace(' ', "_")
+            historyObj = json.loads(history)
+            dict.__init__(self, name=name, intercept=intercept, dividend_coef=dividend_coef, earnings_coef=earnings_coef, treasury_coef=treasury_coef, price_fairvalue=historyObj)
 
