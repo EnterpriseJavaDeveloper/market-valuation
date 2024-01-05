@@ -1,6 +1,9 @@
 import json
 import os
+import time
 import urllib
+
+import numpy as np
 import pandas as pd
 import pickle
 from sklearn.linear_model import LinearRegression
@@ -10,14 +13,25 @@ from RegressionData import RegressionData
 
 class ShillerDataService:
     schiller_data_url = "http://www.econ.yale.edu//~shiller/data/ie_data.xls"
-    file = "test_12.xls"
+    file = "test_11.xls"
     shiller_df = pd.DataFrame()
 
     @classmethod
     def download_shiller_data(cls):
         if not os.path.exists(cls.file):
-            urllib.request.urlretrieve(cls.schiller_data_url, cls.file)  # For Python 3
-        df = pd.read_excel(cls.file, sheet_name='Data', skiprows=range(0, 7), skipfooter=5, usecols='A,G:I,K')
+            urllib.request.urlretrieve(cls.schiller_data_url, cls.file)
+        else:
+            modified = os.path.getmtime(cls.file)
+            dayssince = (time.time() - modified) / 3600 / 24
+            if dayssince > 10:
+                urllib.request.urlretrieve(cls.schiller_data_url, cls.file)
+
+        df = pd.read_excel(cls.file, sheet_name='Data', skiprows=range(0, 7), skipfooter=1, usecols='A,G:I,K')
+        df['Dividend'].replace('', np.nan, inplace=True)
+        df['Earnings'].replace('', np.nan, inplace=True)
+        df.dropna(subset=['Dividend', 'Earnings'], inplace=True)
+
+        # drop all rows before Jan 1, 1960
         cls.shiller_df = df.drop(df.index[:1068])
         return cls.shiller_df
 

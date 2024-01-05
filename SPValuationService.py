@@ -167,7 +167,6 @@ def get_stock_data():
     dictionary['equation_coefficients'] = app.cache.get(SP_500)
     return json.dumps(dictionary, indent=4)
 
-
 # @cross_origin()
 # @socketio.on('my event')
 # def handle_my_custom_event(data):
