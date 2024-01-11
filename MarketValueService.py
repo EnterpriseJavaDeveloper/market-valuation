@@ -1,11 +1,9 @@
 import urllib.request as ul
 import pandas as pd
 import requests
-import yfinance as yf
 from bs4 import BeautifulSoup as soup
 from datetime import date
 from MarketData import MarketData
-from StockQuote import StockQuote
 
 
 class MarketValueService:
@@ -66,11 +64,3 @@ class MarketValueService:
         max_eps = df_new.sort_values(by='FormattedDate', ascending=False).head(4)['Value'].sum()
         future_earnings = {'latest': future_eps, 'max': max_eps}
         return future_earnings
-
-    @classmethod
-    def download_quote(cls):
-        data = yf.download(tickers='^GSPC', period='1d', interval='1m')
-        latest_quote = data.tail(1)
-        stock_quote = StockQuote(latest_quote['Open'][0], latest_quote['High'][0], latest_quote['Low'][0],
-                                 latest_quote['Close'][0])
-        return stock_quote

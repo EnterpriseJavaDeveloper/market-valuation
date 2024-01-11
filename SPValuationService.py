@@ -3,6 +3,8 @@ import json
 import multiprocessing
 import pickle
 import logging
+from datetime import datetime
+
 import pg8000 as pg
 
 from flask import Flask, render_template
@@ -20,6 +22,9 @@ from MarketValueService import MarketValueService
 from RegressionData import RegressionData
 from ShillerDataService import ShillerDataService
 import collections
+
+from StockQuoteService import StockQuoteService
+
 collections.Iterable = collections.abc.Iterable
 
 SP_500 = 'SP500'
@@ -57,10 +62,11 @@ FUTURE_VALUE_INTERVAL_TASK_ID = 'future-value-interval-task-id'
 SAVE_FAIR_MARKET_DATA_TASK_ID = 'save-fair-market-data-task-id'
 market_value_service = MarketValueService()
 fair_market_value_service = FairMarketValueService()
+stock_quote_service = StockQuoteService()
 
 
 def cache_quote():
-    app.cache[SP_QUOTE] = market_value_service.download_quote()
+    app.cache[SP_QUOTE] = stock_quote_service.download_quote('^GSPC', '1d', '1m')
 
 
 def download_future_earnings():
@@ -150,7 +156,7 @@ def initialize_shiller_data():
 
 with app.app_context():
     app.cache[SP_500] = initialize_shiller_data()
-    app.cache[SP_QUOTE] = market_value_service.download_quote()
+    app.cache[SP_QUOTE] = stock_quote_service.download_quote('^GSPC', '1d', '1m')
     app.cache[MARKETDATA] = market_value_service.download_market_values()
     app.cache[FUTURE_EARNINGS] = market_value_service.download_future_earnings()
     app.cache[SP_QUOTE_CALCULATED] = calculate_fair_market_value
@@ -163,8 +169,19 @@ def get_stock_data():
     dictionary = collections.OrderedDict()
     dictionary['stock_valuation'] = calculate_fair_market_value()
     dictionary['market_data'] = app.cache.get(MARKETDATA)
-    dictionary['market_quote'] = app.cache.get(SP_QUOTE)
     dictionary['equation_coefficients'] = app.cache.get(SP_500)
+    dictionary['timestamp'] = datetime.now().strftime("%m/%d/%Y, %H:%M:%S")
+    return json.dumps(dictionary, indent=4)
+
+
+@app.route('/quote/<symbol>')
+@cross_origin()
+def get_stock_quote(symbol=None):
+    dictionary = collections.OrderedDict()
+    if symbol == 'GSPC':
+        dictionary['market_quote'] = app.cache.get(SP_QUOTE)
+    else:
+        dictionary['market_quote'] = stock_quote_service.download_quote(symbol, '1d', '1m')
     return json.dumps(dictionary, indent=4)
 
 # @cross_origin()
