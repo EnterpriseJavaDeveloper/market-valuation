@@ -1,8 +1,10 @@
 import logging
+
+from CoefficientData import CoefficientData
+
 logger = logging.getLogger()
 
 from MarketData import MarketData
-from RegressionData import RegressionData
 from StockQuote import StockQuote
 from StockValuation import StockValuation, StockEarningsModel
 from flask import current_app
@@ -11,7 +13,7 @@ from flask import current_app
 class FairMarketValueService:
 
     @classmethod
-    def calculate_fair_market_value(cls, stock_data: MarketData, regression_data: RegressionData, stock_quote_data: StockQuote, future_earnings_data):
+    def calculate_fair_market_value(cls, stock_data: MarketData, regression_data: CoefficientData, stock_quote_data: StockQuote, future_earnings_data):
         future_earnings = future_earnings_data['latest']
         max_future_earnings = future_earnings_data['max']
         dividend = stock_quote_data.open * stock_data.div_yield / 100
@@ -24,17 +26,17 @@ class FairMarketValueService:
             f'Blended Earnings: {blended_earnings}\t'
             f'Max Earnings: {max_future_earnings}')
         calculated_price = regression_data.intercept + (regression_data.treasury_coef * stock_data.treasury_yield) \
-                       + (regression_data.dividend_coef * dividend) + (regression_data.earnings_coef * earnings)
+            + (regression_data.dividend_coef * dividend) + (regression_data.earnings_coef * earnings)
         future_calculated_price = regression_data.intercept + (
                 regression_data.treasury_coef * stock_data.treasury_yield) \
-                              + (regression_data.dividend_coef * dividend) + (
+            + (regression_data.dividend_coef * dividend) + (
                                           regression_data.earnings_coef * future_earnings)
         blended_calculated_price = regression_data.intercept + (
                 regression_data.treasury_coef * stock_data.treasury_yield) \
-                                   + (regression_data.dividend_coef * dividend) + (
+            + (regression_data.dividend_coef * dividend) + (
                                                regression_data.earnings_coef * blended_earnings)
         max_calculated_price = regression_data.intercept + (regression_data.treasury_coef * stock_data.treasury_yield) \
-                               + (regression_data.dividend_coef * dividend) + (
+            + (regression_data.dividend_coef * dividend) + (
                                            regression_data.earnings_coef * max_future_earnings)
         valued = cls.value_calculation(stock_quote_data.open, calculated_price)
         current_earnings_model = StockEarningsModel(earnings, "Trailing earnings", calculated_price, valued["valued"], valued["diff"])

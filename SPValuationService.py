@@ -14,12 +14,12 @@ from flask.logging import default_handler
 from sqlalchemy import create_engine, text, select, func, and_
 from sqlalchemy.orm import Session
 
+from CoefficientData import CoefficientData
 from FairMarketValueService import FairMarketValueService
 # from flask_socketio import SocketIO, emit
 from flask_cors import CORS, cross_origin
 
 from MarketValueService import MarketValueService
-from RegressionData import RegressionData
 from ShillerDataService import ShillerDataService
 import collections
 
@@ -136,22 +136,23 @@ def initialize_shiller_data():
     shiller_data_service.download_shiller_data()
     regression_data = shiller_data_service.get_regression_data()
     session = Session(engine)
-    query = session.query(RegressionData)
+    query = session.query(CoefficientData)
     query = query.filter(
         and_(
-            RegressionData.treasury_coef == regression_data.treasury_coef,
-            RegressionData.dividend_coef == regression_data.dividend_coef,
-            RegressionData.earnings_coef == regression_data.earnings_coef
+            CoefficientData.treasury_coef == regression_data['coefficients'].treasury_coef,
+            CoefficientData.dividend_coef == regression_data['coefficients'].dividend_coef,
+            CoefficientData.earnings_coef == regression_data['coefficients'].earnings_coef
         )
     )
     query = query.with_entities(func.count())
     coefficient_count = query.scalar()
     if coefficient_count == 0:
-        regression_values = RegressionData("S&P 500", regression_data.intercept, regression_data.dividend_coef,
+        regression_values = CoefficientData("S&P 500", regression_data.intercept, regression_data.dividend_coef,
                                            regression_data.earnings_coef, regression_data.treasury_coef)
         session.add(regression_values)
         session.commit()
     return regression_data
+    # return regression_data['coefficients']
 
 
 with app.app_context():
@@ -169,7 +170,18 @@ def get_stock_data():
     dictionary = collections.OrderedDict()
     dictionary['stock_valuation'] = calculate_fair_market_value()
     dictionary['market_data'] = app.cache.get(MARKETDATA)
-    dictionary['equation_coefficients'] = app.cache.get(SP_500)
+    dictionary['equation_coefficients'] = app.cache.get(SP_500).get('coefficients')
+    dictionary['timestamp'] = datetime.now().strftime("%m/%d/%Y, %H:%M:%S")
+    return json.dumps(dictionary, indent=4)
+
+
+@app.route('/valuation-data/<symbol>')
+@cross_origin()
+def get_valuation_data(symbol=None):
+    dictionary = collections.OrderedDict()
+    dictionary['stock_valuation'] = calculate_fair_market_value()
+    dictionary['market_data'] = app.cache.get(MARKETDATA)
+    dictionary['equation_coefficients'] = app.cache.get(SP_500).get('coefficients')
     dictionary['timestamp'] = datetime.now().strftime("%m/%d/%Y, %H:%M:%S")
     return json.dumps(dictionary, indent=4)
 
@@ -182,6 +194,19 @@ def get_stock_quote(symbol=None):
         dictionary['market_quote'] = app.cache.get(SP_QUOTE)
     else:
         dictionary['market_quote'] = stock_quote_service.download_quote(symbol, '1d', '1m')
+    return json.dumps(dictionary, indent=4)
+
+
+@app.route('/historical-data/<symbol>')
+@cross_origin()
+def get_historical_data(symbol=None):
+    dictionary = collections.OrderedDict()
+    if symbol == 'GSPC':
+        # dictionary['price_fairvalue'] = app.cache.get(SP_500).get('price_fairvalue')
+        dictionary['price_fairvalue'] = app.cache.get(SP_500).get('historicaldata')
+    else:
+        # TODO, should do something different here
+        dictionary['price_fairvalue'] = stock_quote_service.download_quote(symbol, '1d', '1m')
     return json.dumps(dictionary, indent=4)
 
 # @cross_origin()

@@ -8,6 +8,7 @@ import pandas as pd
 import pickle
 from sklearn.linear_model import LinearRegression
 
+from CoefficientData import CoefficientData
 from RegressionData import RegressionData
 
 
@@ -30,6 +31,7 @@ class ShillerDataService:
         df['Dividend'].replace('', np.nan, inplace=True)
         df['Earnings'].replace('', np.nan, inplace=True)
         df.dropna(subset=['Dividend', 'Earnings'], inplace=True)
+        df['Date'] = df['Date'].astype(str).replace('\.', '/', regex=True).apply(lambda x: x + '0' if len(x) == 6 else x).apply(lambda x: x + '/01')
 
         # drop all rows before Jan 1, 1960
         cls.shiller_df = df.drop(df.index[:1068])
@@ -47,8 +49,7 @@ class ShillerDataService:
         earnings_coef = mlr.coef_[1]
         price_fairvalue = cls.shiller_df[['Date', 'Price', 'FairValue', 'Dividend', 'Earnings', 'Rate GS10']]
         price_fairvalue = price_fairvalue.rename(str.lower, axis='columns')
-        regression_data = RegressionData('SP_500', mlr.intercept_, dividend_coef, earnings_coef, treasury_coef,
-                                         price_fairvalue)
-
-        pickle.dump(regression_data, open('ml_model.pkl', 'wb'))
-        return regression_data
+        regression_data = RegressionData(price_fairvalue)
+        coefficient_data = CoefficientData('SP_500', mlr.intercept_, dividend_coef, earnings_coef, treasury_coef)
+        pickle.dump(coefficient_data, open('ml_model.pkl', 'wb'))
+        return {'coefficients': coefficient_data, 'historicaldata': regression_data['price_fairvalue']}
