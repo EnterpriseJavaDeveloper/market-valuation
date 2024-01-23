@@ -27,10 +27,12 @@ class ShillerDataService:
             if dayssince > 10:
                 urllib.request.urlretrieve(cls.schiller_data_url, cls.file)
 
-        df = pd.read_excel(cls.file, sheet_name='Data', skiprows=range(0, 7), skipfooter=1, usecols='A,G:I,K')
+        df = pd.read_excel(cls.file, sheet_name='Data', skiprows=range(0, 7), skipfooter=1, usecols='A:D,G:I,K')
+        df['D'].replace('', np.nan, inplace=True)
         df['Dividend'].replace('', np.nan, inplace=True)
         df['Earnings'].replace('', np.nan, inplace=True)
-        df.dropna(subset=['Dividend', 'Earnings'], inplace=True)
+        df['E'].replace('', np.nan, inplace=True)
+        df.dropna(subset=['Dividend', 'Earnings', 'D', 'E'], inplace=True)
         df['Date'] = df['Date'].astype(str).replace('\.', '/', regex=True).apply(lambda x: x + '0' if len(x) == 6 else x).apply(lambda x: x + '/01')
 
         # drop all rows before Jan 1, 1960
@@ -47,8 +49,9 @@ class ShillerDataService:
         treasury_coef = mlr.coef_[2]
         dividend_coef = mlr.coef_[0]
         earnings_coef = mlr.coef_[1]
-        price_fairvalue = cls.shiller_df[['Date', 'Price', 'FairValue', 'Dividend', 'Earnings', 'Rate GS10']]
+        price_fairvalue = cls.shiller_df[['Date', 'Price', 'FairValue', 'Dividend', 'Earnings', 'P', 'D', 'E', 'Rate GS10']]
         price_fairvalue = price_fairvalue.rename(str.lower, axis='columns')
+        price_fairvalue = price_fairvalue.rename(columns={'p': 'actualprice', 'd': 'actualdividend', 'e': 'actualearnings'})
         regression_data = RegressionData(price_fairvalue)
         coefficient_data = CoefficientData('SP_500', mlr.intercept_, dividend_coef, earnings_coef, treasury_coef)
         pickle.dump(coefficient_data, open('ml_model.pkl', 'wb'))

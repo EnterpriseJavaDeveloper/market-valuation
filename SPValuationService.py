@@ -147,8 +147,8 @@ def initialize_shiller_data():
     query = query.with_entities(func.count())
     coefficient_count = query.scalar()
     if coefficient_count == 0:
-        regression_values = CoefficientData("S&P 500", regression_data.intercept, regression_data.dividend_coef,
-                                           regression_data.earnings_coef, regression_data.treasury_coef)
+        regression_values = CoefficientData("S&P 500", regression_data['coefficients'].intercept, regression_data['coefficients'].dividend_coef,
+                                           regression_data['coefficients'].earnings_coef, regression_data['coefficients'].treasury_coef)
         session.add(regression_values)
         session.commit()
     return regression_data
@@ -202,7 +202,6 @@ def get_stock_quote(symbol=None):
 def get_historical_data(symbol=None):
     dictionary = collections.OrderedDict()
     if symbol == 'GSPC':
-        # dictionary['price_fairvalue'] = app.cache.get(SP_500).get('price_fairvalue')
         dictionary['price_fairvalue'] = app.cache.get(SP_500).get('historicaldata')
     else:
         # TODO, should do something different here
