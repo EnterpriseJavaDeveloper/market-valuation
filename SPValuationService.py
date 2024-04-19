@@ -134,7 +134,8 @@ scheduler.add_job(id=SAVE_FAIR_MARKET_DATA_TASK_ID, func=save_fair_market_value,
 def initialize_shiller_data():
     shiller_data_service = ShillerDataService()
     shiller_data_service.download_shiller_data()
-    regression_data = shiller_data_service.get_regression_data()
+    regression_data = shiller_data_service.get_ml_regression_data()
+    # regression_data = shiller_data_service.get_fitted_regression_data()
     session = Session(engine)
     query = session.query(CoefficientData)
     query = query.filter(
@@ -207,6 +208,20 @@ def get_historical_data(symbol=None):
         # TODO, should do something different here
         dictionary['price_fairvalue'] = stock_quote_service.download_quote(symbol, '1d', '1m')
     return json.dumps(dictionary, indent=4)
+
+@app.route('/earnings/<symbol>')
+@cross_origin()
+def get_earnings(symbol=None):
+    db
+    result = conn.execute(text("select * from earnings"))
+    return result
+    # dictionary = collections.OrderedDict()
+    # if symbol == 'GSPC':
+    #     dictionary['price_fairvalue'] = app.cache.get(SP_500).get('historicaldata')
+    # else:
+    #     # TODO, should do something different here
+    #     dictionary['price_fairvalue'] = stock_quote_service.download_quote(symbol, '1d', '1m')
+    # return json.dumps(dictionary, indent=4)
 
 # @cross_origin()
 # @socketio.on('my event')
