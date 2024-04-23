@@ -7,12 +7,14 @@ from datetime import datetime
 
 import pg8000 as pg
 
-from flask import Flask, render_template
+from flask import Flask, render_template, jsonify
 from flask_apscheduler import APScheduler
 from flask.logging import default_handler
 
 from sqlalchemy import create_engine, text, select, func, and_
 from sqlalchemy.orm import Session
+from flask_sqlalchemy import SQLAlchemy
+from flask_marshmallow import Marshmallow
 
 from CoefficientData import CoefficientData
 from FairMarketValueService import FairMarketValueService
@@ -34,6 +36,9 @@ SP_QUOTE = 'SP500QUOTE'
 SP_QUOTE_CALCULATED = 'SP500QUOTECALCULATED'
 
 app = Flask(__name__)
+app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql+psycopg2://postgres:clouds58@localhost/MarketValuationDB'
+db = SQLAlchemy(app)
+ma = Marshmallow(app)
 
 root = logging.getLogger()
 root.addHandler(default_handler)
@@ -63,6 +68,46 @@ SAVE_FAIR_MARKET_DATA_TASK_ID = 'save-fair-market-data-task-id'
 market_value_service = MarketValueService()
 fair_market_value_service = FairMarketValueService()
 stock_quote_service = StockQuoteService()
+
+
+class Earnings(db.Model):
+    Id = db.Column(db.Integer, primary_key=True)
+    calculated_earnings = db.Column(db.Float)
+    calculated_price = db.Column(db.Float)
+    future_earnings = db.Column(db.Float)
+    blended_earnings = db.Column(db.Float)
+    max_earnings = db.Column(db.Float)
+    future_price = db.Column(db.Float)
+    blended_price = db.Column(db.Float)
+    max_price = db.Column(db.Float)
+    treasury_yield = db.Column(db.Float)
+    dividend = db.Column(db.Float)
+    current_price = db.Column(db.Float)
+    event_time = db.Column(db.DateTime)
+
+    def __init__(self, calculated_earnings, calculated_price, future_earnings, blended_earnings, max_earnings,
+                 future_price, blended_price, max_price, treasury_yield, dividend, current_price, event_time):
+        self.calculated_earnings = calculated_earnings
+        self.calculated_price = calculated_price
+        self.future_earnings = future_earnings
+        self.blended_earnings = blended_earnings
+        self.max_earnings = max_earnings
+        self.future_price = future_price
+        self.blended_price = blended_price
+        self.max_price = max_price
+        self.treasury_yield = treasury_yield
+        self.dividend = dividend
+        self.current_price = current_price
+        self.event_time = event_time
+
+
+class EarningsSchema(ma.Schema):
+    class Meta:
+        fields = ('id', 'calculated_earnings', 'calculated_price', 'future_earnings', 'blended_earnings', 'max_earnings',
+                  'future_price', 'blended_price', 'max_price', 'treasury_yield', 'dividend', 'current_price', 'event_time')
+
+
+earnings_schema = EarningsSchema(many=True)
 
 
 def cache_quote():
@@ -97,16 +142,11 @@ def save_fair_market_value():
     future_earnings_data = app.cache.get(FUTURE_EARNINGS)
     with app.app_context():
         stock_valuation = fair_market_value_service.calculate_fair_market_value(stock_data, regression_data, stock_quote_data, future_earnings_data)
-    conn.run("START TRANSACTION")
-    conn.run("INSERT INTO earnings (calculated_earnings, calculated_price, future_earnings, blended_earnings,"
-             " max_earnings, future_price, blended_price, max_price, treasury_yield, dividend, current_price) "
-             "values (:calculated_earnings, :calculated_price, :future_earnings, :blended_earnings, :max_earnings, "
-             ":future_price, :blended_price, :max_price, :treasury_yield, :dividend, :current_price)",
-             calculated_earnings=stock_valuation.current_earnings.earnings, calculated_price=stock_valuation.current_earnings.calculated_price, future_earnings=stock_valuation.future_earnings.earnings,
-             blended_earnings=stock_valuation.blended_earnings.earnings, max_earnings=stock_valuation.max_earnings.earnings, future_price=stock_valuation.future_earnings.calculated_price,
-             blended_price=stock_valuation.blended_earnings.calculated_price, max_price=stock_valuation.max_earnings.calculated_price,
-             treasury_yield=stock_data.treasury_yield, dividend=stock_valuation.dividend, current_price=stock_quote_data.open)
-    conn.commit()
+        earnings = Earnings(stock_valuation.current_earnings.earnings, stock_valuation.current_earnings.calculated_price, stock_valuation.future_earnings.earnings, stock_valuation.blended_earnings.earnings,
+                        stock_valuation.max_earnings.earnings, stock_valuation.future_earnings.calculated_price, stock_valuation.blended_earnings.calculated_price, stock_valuation.max_earnings.calculated_price,
+                        stock_data.treasury_yield, stock_valuation.dividend, stock_quote_data.open, datetime.now())
+        db.session.add(earnings)
+        db.session.commit()
 
 
 def value_calculation(market_open, calculated_price):
@@ -209,19 +249,14 @@ def get_historical_data(symbol=None):
         dictionary['price_fairvalue'] = stock_quote_service.download_quote(symbol, '1d', '1m')
     return json.dumps(dictionary, indent=4)
 
+
 @app.route('/earnings/<symbol>')
 @cross_origin()
 def get_earnings(symbol=None):
-    db
-    result = conn.execute(text("select * from earnings"))
-    return result
-    # dictionary = collections.OrderedDict()
-    # if symbol == 'GSPC':
-    #     dictionary['price_fairvalue'] = app.cache.get(SP_500).get('historicaldata')
-    # else:
-    #     # TODO, should do something different here
-    #     dictionary['price_fairvalue'] = stock_quote_service.download_quote(symbol, '1d', '1m')
-    # return json.dumps(dictionary, indent=4)
+    all_earnings = Earnings.query.all()
+    results = earnings_schema.dumps(all_earnings)
+    return results
+
 
 # @cross_origin()
 # @socketio.on('my event')
