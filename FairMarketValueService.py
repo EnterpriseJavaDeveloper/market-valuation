@@ -1,11 +1,11 @@
 import logging
 
-from Coefficients import Coefficients
+from model.Coefficients import Coefficients
 
 logger = logging.getLogger()
 
-from MarketData import MarketData
-from StockQuote import StockQuote
+from model.MarketData import MarketData
+from model.StockQuote import StockQuote
 from StockValuation import StockValuation, StockEarningsModel
 from flask import current_app
 

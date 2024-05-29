@@ -3,7 +3,7 @@ import pandas as pd
 import requests
 from bs4 import BeautifulSoup as soup
 from datetime import date
-from MarketData import MarketData
+from model.MarketData import MarketData
 
 
 class MarketValueService:

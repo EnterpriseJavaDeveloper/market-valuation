@@ -1,4 +1,3 @@
-import json
 import os
 import time
 import urllib
@@ -7,12 +6,12 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 import pickle
-from sklearn.linear_model import LinearRegression, LogisticRegression
+from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import train_test_split
 from sklearn import metrics
 
-from Coefficients import Coefficients
-from RegressionData import RegressionData
+from model.Coefficients import Coefficients
+from model.RegressionData import RegressionData
 
 
 class ShillerDataService:

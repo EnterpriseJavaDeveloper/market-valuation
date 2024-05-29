@@ -1,6 +1,6 @@
 import yfinance as yf
 
-from StockQuote import StockQuote
+from model.StockQuote import StockQuote
 from flask import current_app
 
 

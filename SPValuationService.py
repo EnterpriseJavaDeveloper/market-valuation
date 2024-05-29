@@ -13,8 +13,8 @@ from sqlalchemy import create_engine, text, func, and_
 from sqlalchemy.orm import Session
 from flask_marshmallow import Marshmallow
 
-from Coefficients import Coefficients
-from Earnings import Earnings
+from model.Coefficients import Coefficients
+from model.Earnings import Earnings
 from FairMarketValueService import FairMarketValueService
 # from flask_socketio import SocketIO, emit
 from flask_cors import cross_origin
@@ -24,7 +24,7 @@ from ShillerDataService import ShillerDataService
 import collections
 
 from StockQuoteService import StockQuoteService
-from coefficients_schema import CoefficientsSchema
+from schema.coefficients_schema import CoefficientsSchema
 from database import db
 
 collections.Iterable = collections.abc.Iterable
