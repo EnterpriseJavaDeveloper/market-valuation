@@ -2,7 +2,7 @@ import json
 import pickle
 import logging
 from datetime import datetime
-
+# clean up unused code
 import pg8000 as pg
 
 from flask import Flask
@@ -18,6 +18,8 @@ from model.Earnings import Earnings
 from FairMarketValueService import FairMarketValueService
 # from flask_socketio import SocketIO, emit
 from flask_cors import cross_origin
+from shared_resources import calculate_fair_market_value
+from views import StockDataView
 
 from MarketValueService import MarketValueService
 from ShillerDataService import ShillerDataService
@@ -26,6 +28,8 @@ import collections
 from StockQuoteService import StockQuoteService
 from schema.coefficients_schema import CoefficientsSchema
 from database import db
+
+GSPC = 'GSPC'
 
 collections.Iterable = collections.abc.Iterable
 
@@ -70,14 +74,14 @@ market_value_service = MarketValueService()
 fair_market_value_service = FairMarketValueService()
 stock_quote_service = StockQuoteService()
 
-
 coefficients_schema = CoefficientsSchema(many=False)
 
 
 class EarningsSchema(ma.Schema):
     class Meta:
-        fields = ('id', 'calculated_earnings', 'calculated_price', 'future_earnings', 'blended_earnings', 'max_earnings',
-                  'future_price', 'blended_price', 'max_price', 'treasury_yield', 'dividend', 'current_price', 'event_time')
+        fields = (
+        'id', 'calculated_earnings', 'calculated_price', 'future_earnings', 'blended_earnings', 'max_earnings',
+        'future_price', 'blended_price', 'max_price', 'treasury_yield', 'dividend', 'current_price', 'event_time')
 
 
 earnings_schema = EarningsSchema(many=True)
@@ -94,16 +98,18 @@ def download_future_earnings():
 def cache_market_values():
     app.cache[MARKETDATA] = market_value_service.download_market_values()
 
+def cache_fair_market_values():
+    app.cahse
 
-def calculate_fair_market_value():
-    stock_data = app.cache.get(MARKETDATA)
-    coefficient_data = pickle.load(open('ml_model_regression.pkl', 'rb'))
-    stock_quote_data = app.cache.get(SP_QUOTE)
-    future_earnings_data = app.cache.get(FUTURE_EARNINGS)
-
-    with app.app_context():
-        stock_valuation = fair_market_value_service.calculate_fair_market_value(stock_data, coefficient_data, stock_quote_data, future_earnings_data)
-    return stock_valuation
+# def calculate_fair_market_value():
+#     stock_data = app.cache.get(MARKETDATA)
+#     coefficient_data = pickle.load(open('ml_model_regression.pkl', 'rb'))
+#     stock_quote_data = app.cache.get(SP_QUOTE)
+#     future_earnings_data = app.cache.get(FUTURE_EARNINGS)
+#
+#     with app.app_context():
+#         stock_valuation = fair_market_value_service.calculate_fair_market_value(stock_data, coefficient_data, stock_quote_data, future_earnings_data)
+#     return stock_valuation
 
 
 def save_fair_market_value():
@@ -113,9 +119,14 @@ def save_fair_market_value():
     future_earnings_data = app.cache.get(FUTURE_EARNINGS)
     with app.app_context():
         # TODO don't save more than once a day
-        stock_valuation = fair_market_value_service.calculate_fair_market_value(stock_data, coefficient_data, stock_quote_data, future_earnings_data)
-        earnings = Earnings(stock_valuation.current_earnings.earnings, stock_valuation.current_earnings.calculated_price, stock_valuation.future_earnings.earnings, stock_valuation.blended_earnings.earnings,
-                            stock_valuation.max_earnings.earnings, stock_valuation.future_earnings.calculated_price, stock_valuation.blended_earnings.calculated_price, stock_valuation.max_earnings.calculated_price,
+        stock_valuation = fair_market_value_service.calculate_fair_market_value(stock_data, coefficient_data,
+                                                                                stock_quote_data, future_earnings_data)
+        earnings = Earnings(stock_valuation.current_earnings.earnings,
+                            stock_valuation.current_earnings.calculated_price, stock_valuation.future_earnings.earnings,
+                            stock_valuation.blended_earnings.earnings,
+                            stock_valuation.max_earnings.earnings, stock_valuation.future_earnings.calculated_price,
+                            stock_valuation.blended_earnings.calculated_price,
+                            stock_valuation.max_earnings.calculated_price,
                             stock_data.treasury_yield, stock_valuation.dividend, stock_quote_data.open, datetime.now())
         db.session.add(earnings)
         db.session.commit()
@@ -133,13 +144,13 @@ def value_calculation(market_open, calculated_price):
 
 def cache_calculated_stock_data():
     with app.app_context():
-        app.cache[SP_QUOTE_CALCULATED] = calculate_fair_market_value
+        app.cache[SP_QUOTE_CALCULATED] = calculate_fair_market_value(app)
 
 
 scheduler.add_job(id=STOCK_QUOTE_INTERVAL_TASK_ID, func=cache_quote, trigger='interval', seconds=60)
 scheduler.add_job(id=MARKET_DATA_INTERVAL_TASK_ID, func=cache_market_values, trigger='interval', seconds=3000)
-scheduler.add_job(id=VALUATION_INTERVAL_TASK_ID, func=calculate_fair_market_value, trigger='interval', seconds=60)
 scheduler.add_job(id=FUTURE_VALUE_INTERVAL_TASK_ID, func=download_future_earnings, trigger='interval', seconds=60)
+scheduler.add_job(id=VALUATION_INTERVAL_TASK_ID, func=cache_calculated_stock_data, trigger='interval', seconds=60)
 scheduler.add_job(id=SAVE_FAIR_MARKET_DATA_TASK_ID, func=save_fair_market_value, trigger='interval', hours=1)
 
 
@@ -147,7 +158,7 @@ def initialize_shiller_data():
     shiller_data_service = ShillerDataService()
     use_existing = shiller_data_service.download_shiller_data()
     if not use_existing:
-        #TODO use some flag to determine which regression model to use
+        # TODO use some flag to determine which regression model to use
         regression_data = shiller_data_service.get_ml_regression_data()
         # regression_data = shiller_data_service.get_fitted_regression_data()
         session = Session(engine)
@@ -162,8 +173,11 @@ def initialize_shiller_data():
         query = query.with_entities(func.count())
         coefficient_count = query.scalar()
         if coefficient_count == 0:
-            regression_values = Coefficients("S&P 500", regression_data['coefficients'].intercept, regression_data['coefficients'].treasury,
-                                         regression_data['coefficients'].earnings, regression_data['coefficients'].dividend, regression_data['coefficients'].create_date)
+            regression_values = Coefficients("S&P 500", regression_data['coefficients'].intercept,
+                                             regression_data['coefficients'].treasury,
+                                             regression_data['coefficients'].earnings,
+                                             regression_data['coefficients'].dividend,
+                                             regression_data['coefficients'].create_date)
             session.add(regression_values)
             session.commit()
     else:
@@ -182,18 +196,20 @@ with app.app_context():
     app.cache[FUTURE_EARNINGS] = market_value_service.download_future_earnings()
     app.cache[SP_QUOTE_CALCULATED] = calculate_fair_market_value
 
+app.add_url_rule('/sp-data', view_func=StockDataView.as_view('stock_data'))
+
 
 # http://127.0.0.1:5000/sp-data
-@app.route('/sp-data')
-@cross_origin()
-def get_stock_data():
-    dictionary = collections.OrderedDict()
-    dictionary['stock_valuation'] = calculate_fair_market_value()
-    dictionary['market_data'] = app.cache.get(MARKETDATA)
-    json_output = coefficients_schema.dump(app.cache.get(SP_500).get('coefficients'))
-    dictionary['equation_coefficients'] = json_output
-    dictionary['timestamp'] = datetime.now().strftime("%m/%d/%Y, %H:%M:%S")
-    return json.dumps(dictionary, indent=4)
+# @app.route('/sp-data')
+# @cross_origin()
+# def get_stock_data():
+#     dictionary = collections.OrderedDict()
+#     dictionary['stock_valuation'] = calculate_fair_market_value()
+#     dictionary['market_data'] = app.cache.get(MARKETDATA)
+#     json_output = coefficients_schema.dump(app.cache.get(SP_500).get('coefficients'))
+#     dictionary['equation_coefficients'] = json_output
+#     dictionary['timestamp'] = datetime.now().strftime("%m/%d/%Y, %H:%M:%S")
+#     return json.dumps(dictionary, indent=4)
 
 
 @app.route('/valuation-data/<symbol>')
@@ -222,7 +238,9 @@ def get_stock_quote(symbol=None):
 @cross_origin()
 def get_historical_data(symbol=None):
     dictionary = collections.OrderedDict()
-    if symbol == 'GSPC':
+    if symbol == GSPC:
+        # convert GSPC to a variable
+
         dictionary['price_fairvalue'] = app.cache.get(SP_500).get('historicaldata')
     else:
         # TODO, should do something different here
