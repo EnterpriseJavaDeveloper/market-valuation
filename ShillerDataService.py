@@ -17,7 +17,7 @@ from model.RegressionData import RegressionData
 class ShillerDataService:
     schiller_data_url = "https://img1.wsimg.com/blobby/go/e5e77e0b-59d1-44d9-ab25-4763ac982e53/downloads/ie_data.xls"
     # schiller_data_url = "http://www.econ.yale.edu//~shiller/data/ie_data.xls"
-    file = "test_11.xls"
+    file = "shiller.xls"
     shiller_df = pd.DataFrame()
 
     @classmethod

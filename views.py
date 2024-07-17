@@ -1,6 +1,4 @@
 from flask.views import MethodView
-from flask import jsonify
-from model.Earnings import Earnings
 from shared_resources import calculate_fair_market_value
 from schema.coefficients_schema import CoefficientsSchema
 from flask_cors import cross_origin
@@ -22,3 +20,5 @@ class StockDataView(MethodView):
         dictionary['equation_coefficients'] = json_output
         dictionary['timestamp'] = datetime.now().strftime("%m/%d/%Y, %H:%M:%S")
         return json.dumps(dictionary, indent=4)
+
+

@@ -12,3 +12,4 @@ sklearn~=0.0
 scikit-learn~=1.1.2
 pg8000~=1.30.3
 marshmallow~=3.21.1
+python-dotenv~=1.0.1

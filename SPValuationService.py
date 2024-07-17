@@ -2,16 +2,15 @@ import json
 import pickle
 import logging
 from datetime import datetime
-# clean up unused code
-import pg8000 as pg
 
 from flask import Flask
 from flask_apscheduler import APScheduler
 from flask.logging import default_handler
 
-from sqlalchemy import create_engine, text, func, and_
-from sqlalchemy.orm import Session
+from sqlalchemy import func, and_
 from flask_marshmallow import Marshmallow
+from dotenv import load_dotenv
+import os
 
 from model.Coefficients import Coefficients
 from model.Earnings import Earnings
@@ -40,9 +39,12 @@ SP_QUOTE = 'SP500QUOTE'
 SP_QUOTE_CALCULATED = 'SP500QUOTECALCULATED'
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql+psycopg2://postgres:clouds58@localhost/MarketValuationDB'
+load_dotenv()
+db_conn = ("postgresql+psycopg2://{user}:{password}@{hostname}/{database}"
+           .format(user=os.environ.get('user'), password=os.environ.get('password'), hostname=os.environ.get('host')
+                   , database=os.environ.get('database')))
+app.config['SQLALCHEMY_DATABASE_URI'] = db_conn
 db.init_app(app)
-# db = SQLAlchemy(app)
 ma = Marshmallow(app)
 
 root = logging.getLogger()
@@ -55,16 +57,14 @@ scheduler.init_app(app)
 scheduler.start()
 app.config['SECRET_KEY'] = 'secret!'
 app.config['CORS_HEADERS'] = 'Content-Type'
+app.config['SQLALCHEMY_ECHO'] = True
 app.logger.setLevel(logging.INFO)
-engine = create_engine("postgresql+psycopg2://postgres:clouds58@localhost/MarketValuationDB")
-with engine.connect() as conn:
-    result = conn.execution_options(stream_results=True).execute(text("select * from earnings"))
-# socketio = SocketIO(app)
-conn = pg.connect(
-    host="localhost",
-    database="MarketValuationDB",
-    user="postgres",
-    password="clouds58")
+
+logging.basicConfig(level=logging.INFO)
+sqlalchemy_logger = logging.getLogger('sqlalchemy.engine')
+sqlalchemy_logger.setLevel(logging.INFO)
+sqlalchemy_logger.addHandler(logging.StreamHandler())  # Ensure logging to console
+
 STOCK_QUOTE_INTERVAL_TASK_ID = 'stock-quote-interval-task-id'
 MARKET_DATA_INTERVAL_TASK_ID = 'market-data-interval-task-id'
 VALUATION_INTERVAL_TASK_ID = 'valuation-interval-task-id'
@@ -98,19 +98,6 @@ def download_future_earnings():
 def cache_market_values():
     app.cache[MARKETDATA] = market_value_service.download_market_values()
 
-def cache_fair_market_values():
-    app.cahse
-
-# def calculate_fair_market_value():
-#     stock_data = app.cache.get(MARKETDATA)
-#     coefficient_data = pickle.load(open('ml_model_regression.pkl', 'rb'))
-#     stock_quote_data = app.cache.get(SP_QUOTE)
-#     future_earnings_data = app.cache.get(FUTURE_EARNINGS)
-#
-#     with app.app_context():
-#         stock_valuation = fair_market_value_service.calculate_fair_market_value(stock_data, coefficient_data, stock_quote_data, future_earnings_data)
-#     return stock_valuation
-
 
 def save_fair_market_value():
     stock_data = app.cache.get(MARKETDATA)
@@ -129,6 +116,7 @@ def save_fair_market_value():
                             stock_valuation.max_earnings.calculated_price,
                             stock_data.treasury_yield, stock_valuation.dividend, stock_quote_data.open, datetime.now())
         db.session.add(earnings)
+        db.session.query()
         db.session.commit()
 
 
@@ -157,29 +145,35 @@ scheduler.add_job(id=SAVE_FAIR_MARKET_DATA_TASK_ID, func=save_fair_market_value,
 def initialize_shiller_data():
     shiller_data_service = ShillerDataService()
     use_existing = shiller_data_service.download_shiller_data()
+
     if not use_existing:
         # TODO use some flag to determine which regression model to use
         regression_data = shiller_data_service.get_ml_regression_data()
         # regression_data = shiller_data_service.get_fitted_regression_data()
-        session = Session(engine)
-        query = session.query(Coefficients)
-        query = query.filter(
-            and_(
-                Coefficients.treasury == regression_data['coefficients'].treasury,
-                Coefficients.dividend == regression_data['coefficients'].dividend,
-                Coefficients.earnings == regression_data['coefficients'].earnings
+
+        with app.app_context():
+            logger = logging.getLogger(__name__)
+
+            query = db.session.query(Coefficients)
+            query = query.filter(
+                and_(
+                    Coefficients.treasury == regression_data['coefficients'].treasury,
+                    Coefficients.dividend == regression_data['coefficients'].dividend,
+                    Coefficients.earnings == regression_data['coefficients'].earnings
+                )
             )
-        )
-        query = query.with_entities(func.count())
-        coefficient_count = query.scalar()
-        if coefficient_count == 0:
-            regression_values = Coefficients("S&P 500", regression_data['coefficients'].intercept,
+            query = query.with_entities(func.count())
+            query_str = str(query)
+            logger.info(f"Executing query: {query_str}")
+            coefficient_count = query.scalar()
+            if coefficient_count == 0:
+                regression_values = Coefficients("S&P 500", regression_data['coefficients'].intercept,
                                              regression_data['coefficients'].treasury,
                                              regression_data['coefficients'].earnings,
                                              regression_data['coefficients'].dividend,
                                              regression_data['coefficients'].create_date)
-            session.add(regression_values)
-            session.commit()
+                db.session.add(regression_values)
+                db.session.commit()
     else:
         print('Using existing model')
         file = open('ml_model_regression.pkl', 'rb')
@@ -196,20 +190,8 @@ with app.app_context():
     app.cache[FUTURE_EARNINGS] = market_value_service.download_future_earnings()
     app.cache[SP_QUOTE_CALCULATED] = calculate_fair_market_value
 
-app.add_url_rule('/sp-data', view_func=StockDataView.as_view('stock_data'))
-
-
 # http://127.0.0.1:5000/sp-data
-# @app.route('/sp-data')
-# @cross_origin()
-# def get_stock_data():
-#     dictionary = collections.OrderedDict()
-#     dictionary['stock_valuation'] = calculate_fair_market_value()
-#     dictionary['market_data'] = app.cache.get(MARKETDATA)
-#     json_output = coefficients_schema.dump(app.cache.get(SP_500).get('coefficients'))
-#     dictionary['equation_coefficients'] = json_output
-#     dictionary['timestamp'] = datetime.now().strftime("%m/%d/%Y, %H:%M:%S")
-#     return json.dumps(dictionary, indent=4)
+app.add_url_rule('/sp-data', view_func=StockDataView.as_view('stock_data'))
 
 
 @app.route('/valuation-data/<symbol>')
