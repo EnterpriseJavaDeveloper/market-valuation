@@ -7,16 +7,16 @@ from flask import Flask
 from flask_apscheduler import APScheduler
 from flask.logging import default_handler
 
-from sqlalchemy import func, and_
 from flask_marshmallow import Marshmallow
 from dotenv import load_dotenv
 import os
 
-from model.Coefficients import Coefficients
 from model.Earnings import Earnings
 from FairMarketValueService import FairMarketValueService
 # from flask_socketio import SocketIO, emit
 from flask_cors import cross_origin
+
+from schema.earnings_schema import EarningsSchema
 from shared_resources import calculate_fair_market_value
 from views import StockDataView
 
@@ -75,15 +75,6 @@ fair_market_value_service = FairMarketValueService()
 stock_quote_service = StockQuoteService()
 
 coefficients_schema = CoefficientsSchema(many=False)
-
-
-class EarningsSchema(ma.Schema):
-    class Meta:
-        fields = (
-        'id', 'calculated_earnings', 'calculated_price', 'future_earnings', 'blended_earnings', 'max_earnings',
-        'future_price', 'blended_price', 'max_price', 'treasury_yield', 'dividend', 'current_price', 'event_time')
-
-
 earnings_schema = EarningsSchema(many=True)
 
 
@@ -99,96 +90,34 @@ def cache_market_values():
     app.cache[MARKETDATA] = market_value_service.download_market_values()
 
 
-def save_fair_market_value():
-    stock_data = app.cache.get(MARKETDATA)
-    coefficient_data = pickle.load(open('ml_model_regression.pkl', 'rb'))  # TODO get regression data from database
-    stock_quote_data = app.cache.get(SP_QUOTE)
-    future_earnings_data = app.cache.get(FUTURE_EARNINGS)
-    with app.app_context():
-        # TODO don't save more than once a day
-        stock_valuation = fair_market_value_service.calculate_fair_market_value(stock_data, coefficient_data,
-                                                                                stock_quote_data, future_earnings_data)
-        earnings = Earnings(stock_valuation.current_earnings.earnings,
-                            stock_valuation.current_earnings.calculated_price, stock_valuation.future_earnings.earnings,
-                            stock_valuation.blended_earnings.earnings,
-                            stock_valuation.max_earnings.earnings, stock_valuation.future_earnings.calculated_price,
-                            stock_valuation.blended_earnings.calculated_price,
-                            stock_valuation.max_earnings.calculated_price,
-                            stock_data.treasury_yield, stock_valuation.dividend, stock_quote_data.open, datetime.now())
-        db.session.add(earnings)
-        db.session.query()
-        db.session.commit()
-
-
-def value_calculation(market_open, calculated_price):
-    if market_open > calculated_price:
-        valued_string = "OVERVALUED"
-        valued_diff = (market_open - calculated_price) / calculated_price * 100
-    else:
-        valued_string = "UNDERVALUED"
-        valued_diff = (calculated_price - market_open) / calculated_price * 100
-    return {"valued": valued_string, "diff": valued_diff}
-
-
 def cache_calculated_stock_data():
     with app.app_context():
         app.cache[SP_QUOTE_CALCULATED] = calculate_fair_market_value(app)
 
 
+def save_fair_market_value():
+    with app.app_context():
+        fair_market_value_service.save_fair_market_value()
+
+
+scheduler.add_job(id='stock_quote_startup', func=cache_quote, trigger='date', next_run_time=datetime.now())
 scheduler.add_job(id=STOCK_QUOTE_INTERVAL_TASK_ID, func=cache_quote, trigger='interval', seconds=60)
-scheduler.add_job(id=MARKET_DATA_INTERVAL_TASK_ID, func=cache_market_values, trigger='interval', seconds=3000)
-scheduler.add_job(id=FUTURE_VALUE_INTERVAL_TASK_ID, func=download_future_earnings, trigger='interval', seconds=60)
-scheduler.add_job(id=VALUATION_INTERVAL_TASK_ID, func=cache_calculated_stock_data, trigger='interval', seconds=60)
+scheduler.add_job(id='market_data_startup', func=cache_market_values, trigger='date', next_run_time=datetime.now())
+scheduler.add_job(id=MARKET_DATA_INTERVAL_TASK_ID, func=cache_market_values, trigger='interval', hours=24)
+scheduler.add_job(id='future_earnings_startup', func=download_future_earnings, trigger='date', next_run_time=datetime.now())
+scheduler.add_job(id=FUTURE_VALUE_INTERVAL_TASK_ID, func=download_future_earnings, trigger='interval', hours=24)
+# scheduler.add_job(id='calculated_stock_data_startup', func=cache_calculated_stock_data, trigger='date', next_run_time=datetime.now())
+scheduler.add_job(id=VALUATION_INTERVAL_TASK_ID, func=cache_calculated_stock_data, trigger='interval', hours=24)
 scheduler.add_job(id=SAVE_FAIR_MARKET_DATA_TASK_ID, func=save_fair_market_value, trigger='interval', hours=1)
 
 
-def initialize_shiller_data():
-    shiller_data_service = ShillerDataService()
-    use_existing = shiller_data_service.download_shiller_data()
-
-    if not use_existing:
-        # TODO use some flag to determine which regression model to use
-        regression_data = shiller_data_service.get_ml_regression_data()
-        # regression_data = shiller_data_service.get_fitted_regression_data()
-
-        with app.app_context():
-            logger = logging.getLogger(__name__)
-
-            query = db.session.query(Coefficients)
-            query = query.filter(
-                and_(
-                    Coefficients.treasury == regression_data['coefficients'].treasury,
-                    Coefficients.dividend == regression_data['coefficients'].dividend,
-                    Coefficients.earnings == regression_data['coefficients'].earnings
-                )
-            )
-            query = query.with_entities(func.count())
-            query_str = str(query)
-            logger.info(f"Executing query: {query_str}")
-            coefficient_count = query.scalar()
-            if coefficient_count == 0:
-                regression_values = Coefficients("S&P 500", regression_data['coefficients'].intercept,
-                                             regression_data['coefficients'].treasury,
-                                             regression_data['coefficients'].earnings,
-                                             regression_data['coefficients'].dividend,
-                                             regression_data['coefficients'].create_date)
-                db.session.add(regression_values)
-                db.session.commit()
-    else:
-        print('Using existing model')
-        file = open('ml_model_regression.pkl', 'rb')
-        coefficient_data = pickle.load(file)
-        historical_data = pickle.load(file)
-        return {'coefficients': coefficient_data, 'historicaldata': historical_data}
-    return regression_data
-
-
 with app.app_context():
-    app.cache[SP_500] = initialize_shiller_data()
-    app.cache[SP_QUOTE] = stock_quote_service.download_quote('^GSPC', '1d', '1m')
-    app.cache[MARKETDATA] = market_value_service.download_market_values()
-    app.cache[FUTURE_EARNINGS] = market_value_service.download_future_earnings()
+    app.cache[SP_500] = ShillerDataService.initialize_shiller_data()
+    # app.cache[SP_QUOTE] = stock_quote_service.download_quote('^GSPC', '1d', '1m')
+    # app.cache[MARKETDATA] = market_value_service.download_market_values()
+    # app.cache[FUTURE_EARNINGS] = market_value_service.download_future_earnings()
     app.cache[SP_QUOTE_CALCULATED] = calculate_fair_market_value
+    # fair_market_value_service.save_fair_market_value()
 
 # http://127.0.0.1:5000/sp-data
 app.add_url_rule('/sp-data', view_func=StockDataView.as_view('stock_data'))

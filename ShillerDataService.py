@@ -6,10 +6,15 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 import pickle
+
+from flask import current_app
 from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import train_test_split
 from sklearn import metrics
+from sqlalchemy import and_, func
+from sqlalchemy.testing.plugin.plugin_base import logging
 
+from database import db
 from model.Coefficients import Coefficients
 from model.RegressionData import RegressionData
 
@@ -19,6 +24,45 @@ class ShillerDataService:
     # schiller_data_url = "http://www.econ.yale.edu//~shiller/data/ie_data.xls"
     file = "shiller.xls"
     shiller_df = pd.DataFrame()
+
+    @classmethod
+    def initialize_shiller_data(cls):
+        use_existing = cls.download_shiller_data()
+
+        if not use_existing:
+            regression_data = cls.get_ml_regression_data()
+            # regression_data = cls.get_fitted_regression_data()
+
+            with current_app.app_context():
+                logger = logging.getLogger(__name__)
+
+                query = db.session.query(Coefficients)
+                query = query.filter(
+                    and_(
+                        Coefficients.treasury == regression_data['coefficients'].treasury,
+                        Coefficients.dividend == regression_data['coefficients'].dividend,
+                        Coefficients.earnings == regression_data['coefficients'].earnings
+                    )
+                )
+                query = query.with_entities(func.count())
+                query_str = str(query)
+                logger.info(f"Executing query: {query_str}")
+                coefficient_count = query.scalar()
+                if coefficient_count == 0:
+                    regression_values = Coefficients("S&P 500", regression_data['coefficients'].intercept,
+                                                     regression_data['coefficients'].treasury,
+                                                     regression_data['coefficients'].earnings,
+                                                     regression_data['coefficients'].dividend,
+                                                     regression_data['coefficients'].create_date)
+                    db.session.add(regression_values)
+                    db.session.commit()
+        else:
+            print('Using existing model')
+            file = open('ml_model_regression.pkl', 'rb')
+            coefficient_data = pickle.load(file)
+            historical_data = pickle.load(file)
+            return {'coefficients': coefficient_data, 'historicaldata': historical_data}
+        return regression_data
 
     @classmethod
     def download_shiller_data(cls):
