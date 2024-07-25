@@ -1,7 +1,7 @@
 import json
 import pickle
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from flask import Flask
 from flask_apscheduler import APScheduler
@@ -10,6 +10,7 @@ from flask.logging import default_handler
 from flask_marshmallow import Marshmallow
 from dotenv import load_dotenv
 import os
+
 
 from model.Earnings import Earnings
 from FairMarketValueService import FairMarketValueService
@@ -79,15 +80,18 @@ earnings_schema = EarningsSchema(many=True)
 
 
 def cache_quote():
-    app.cache[SP_QUOTE] = stock_quote_service.download_quote('^GSPC', '1d', '1m')
+    with app.app_context():
+        app.cache[SP_QUOTE] = stock_quote_service.download_quote('^GSPC', '1d', '1m')
 
 
 def download_future_earnings():
-    app.cache[FUTURE_EARNINGS] = market_value_service.download_future_earnings()
+    with app.app_context():
+        app.cache[FUTURE_EARNINGS] = market_value_service.download_future_earnings()
 
 
 def cache_market_values():
-    app.cache[MARKETDATA] = market_value_service.download_market_values()
+    with app.app_context():
+        app.cache[MARKETDATA] = market_value_service.download_market_values()
 
 
 def cache_calculated_stock_data():
@@ -100,24 +104,23 @@ def save_fair_market_value():
         fair_market_value_service.save_fair_market_value()
 
 
-scheduler.add_job(id='stock_quote_startup', func=cache_quote, trigger='date', next_run_time=datetime.now())
-scheduler.add_job(id=STOCK_QUOTE_INTERVAL_TASK_ID, func=cache_quote, trigger='interval', seconds=60)
-scheduler.add_job(id='market_data_startup', func=cache_market_values, trigger='date', next_run_time=datetime.now())
-scheduler.add_job(id=MARKET_DATA_INTERVAL_TASK_ID, func=cache_market_values, trigger='interval', hours=24)
-scheduler.add_job(id='future_earnings_startup', func=download_future_earnings, trigger='date', next_run_time=datetime.now())
-scheduler.add_job(id=FUTURE_VALUE_INTERVAL_TASK_ID, func=download_future_earnings, trigger='interval', hours=24)
-# scheduler.add_job(id='calculated_stock_data_startup', func=cache_calculated_stock_data, trigger='date', next_run_time=datetime.now())
-scheduler.add_job(id=VALUATION_INTERVAL_TASK_ID, func=cache_calculated_stock_data, trigger='interval', hours=24)
-scheduler.add_job(id=SAVE_FAIR_MARKET_DATA_TASK_ID, func=save_fair_market_value, trigger='interval', hours=1)
-
-
 with app.app_context():
+    scheduler.add_job(id='stock_quote_startup', func=cache_quote, trigger='date', next_run_time=datetime.now())
+    scheduler.add_job(id='market-data-startup-task-id', func=cache_market_values, trigger='date',
+                      next_run_time=datetime.now() + timedelta(seconds=5))
+    scheduler.add_job(id='calculated-stock-data-startup-task-id', func=cache_calculated_stock_data, trigger='date',
+                      next_run_time=datetime.now() + timedelta(seconds=10))
+    scheduler.add_job(id='future-earnings-startup-task-id', func=download_future_earnings, trigger='date',
+                      next_run_time=datetime.now() + timedelta(seconds=15))
+    scheduler.add_job(id='save-fair-market-value-startup-task-id', func=save_fair_market_value, trigger='date',
+                      next_run_time=datetime.now() + timedelta(seconds=20))
+    scheduler.add_job(id=STOCK_QUOTE_INTERVAL_TASK_ID, func=cache_quote, trigger='interval', seconds=60)
+    scheduler.add_job(id=MARKET_DATA_INTERVAL_TASK_ID, func=cache_market_values, trigger='interval', hours=24)
+    scheduler.add_job(id=FUTURE_VALUE_INTERVAL_TASK_ID, func=download_future_earnings, trigger='interval', hours=24)
+    scheduler.add_job(id=VALUATION_INTERVAL_TASK_ID, func=cache_calculated_stock_data, trigger='interval', hours=24)
+    scheduler.add_job(id=SAVE_FAIR_MARKET_DATA_TASK_ID, func=save_fair_market_value, trigger='interval', hours=24)
     app.cache[SP_500] = ShillerDataService.initialize_shiller_data()
-    # app.cache[SP_QUOTE] = stock_quote_service.download_quote('^GSPC', '1d', '1m')
-    # app.cache[MARKETDATA] = market_value_service.download_market_values()
-    # app.cache[FUTURE_EARNINGS] = market_value_service.download_future_earnings()
-    app.cache[SP_QUOTE_CALCULATED] = calculate_fair_market_value
-    # fair_market_value_service.save_fair_market_value()
+
 
 # http://127.0.0.1:5000/sp-data
 app.add_url_rule('/sp-data', view_func=StockDataView.as_view('stock_data'))

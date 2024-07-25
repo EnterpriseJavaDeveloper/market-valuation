@@ -1,6 +1,6 @@
 import logging
 import pickle
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from database import db
 from model.Coefficients import Coefficients
@@ -80,6 +80,12 @@ class FairMarketValueService:
     @classmethod
     def save_fair_market_value(cls):
         with current_app.app_context():
+            today = datetime.now().date()
+            existing_earnings = Earnings.query.filter(Earnings.event_time > today - timedelta(days=1)).first()
+
+            if existing_earnings:
+                current_app.logger.info("Earnings have already been saved for today.")
+                return
             stock_data = current_app.cache.get('MARKETDATA')
             coefficient_data = pickle.load(open('ml_model_regression.pkl', 'rb'))  # Adjust path as necessary
             stock_quote_data = current_app.cache.get('SP500QUOTE')
