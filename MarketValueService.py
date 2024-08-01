@@ -3,6 +3,8 @@ import pandas as pd
 import requests
 from bs4 import BeautifulSoup as soup
 from datetime import date
+
+from caching import cache
 from model.MarketData import MarketData
 
 
@@ -43,6 +45,7 @@ class MarketValueService:
         return item_locator.contents[2].text.strip()
 
     @classmethod
+    @cache.cached(timeout=86400, key_prefix='future_earnings')
     def download_future_earnings(cls):
         header = {
             "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.75 Safari/537.36",

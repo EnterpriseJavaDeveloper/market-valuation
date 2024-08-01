@@ -1,5 +1,4 @@
 import json
-import pickle
 import logging
 from datetime import datetime, timedelta
 
@@ -13,12 +12,11 @@ import os
 
 
 from model.Earnings import Earnings
-from FairMarketValueService import FairMarketValueService
 # from flask_socketio import SocketIO, emit
 from flask_cors import cross_origin
 
 from schema.earnings_schema import EarningsSchema
-from shared_resources import calculate_fair_market_value
+from FairMarketValueService import FairMarketValueService
 from views import StockDataView
 
 from MarketValueService import MarketValueService
@@ -28,6 +26,7 @@ import collections
 from StockQuoteService import StockQuoteService
 from schema.coefficients_schema import CoefficientsSchema
 from database import db
+from caching import cache
 
 GSPC = 'GSPC'
 
@@ -51,15 +50,20 @@ ma = Marshmallow(app)
 root = logging.getLogger()
 root.addHandler(default_handler)
 
-# CORS(app)
-app.cache = {}
-scheduler = APScheduler()
-scheduler.init_app(app)
-scheduler.start()
+app.config['CACHE_TYPE'] = 'simple'
+app.config['CACHE_DEFAULT_TIMEOUT'] = 300
 app.config['SECRET_KEY'] = 'secret!'
 app.config['CORS_HEADERS'] = 'Content-Type'
 app.config['SQLALCHEMY_ECHO'] = True
+# CORS(app)
+cache.init_app(app)
+
+scheduler = APScheduler()
+scheduler.init_app(app)
+scheduler.start()
+
 app.logger.setLevel(logging.INFO)
+
 
 logging.basicConfig(level=logging.INFO)
 sqlalchemy_logger = logging.getLogger('sqlalchemy.engine')
@@ -80,28 +84,23 @@ earnings_schema = EarningsSchema(many=True)
 
 
 def cache_quote():
-    with app.app_context():
-        app.cache[SP_QUOTE] = stock_quote_service.download_quote('^GSPC', '1d', '1m')
+    cache.set(SP_QUOTE, stock_quote_service.download_quote('^GSPC', '1d', '1m'))
 
 
 def download_future_earnings():
-    with app.app_context():
-        app.cache[FUTURE_EARNINGS] = market_value_service.download_future_earnings()
+    cache.set(FUTURE_EARNINGS, market_value_service.download_future_earnings())
 
 
 def cache_market_values():
-    with app.app_context():
-        app.cache[MARKETDATA] = market_value_service.download_market_values()
+    cache.set(MARKETDATA, market_value_service.download_market_values())
 
 
 def cache_calculated_stock_data():
-    with app.app_context():
-        app.cache[SP_QUOTE_CALCULATED] = calculate_fair_market_value(app)
+    cache.set(SP_QUOTE_CALCULATED, FairMarketValueService.calculate_fair_market_value())
 
 
 def save_fair_market_value():
-    with app.app_context():
-        fair_market_value_service.save_fair_market_value()
+    fair_market_value_service.save_fair_market_value()
 
 
 with app.app_context():
@@ -119,7 +118,7 @@ with app.app_context():
     scheduler.add_job(id=FUTURE_VALUE_INTERVAL_TASK_ID, func=download_future_earnings, trigger='interval', hours=24)
     scheduler.add_job(id=VALUATION_INTERVAL_TASK_ID, func=cache_calculated_stock_data, trigger='interval', hours=24)
     scheduler.add_job(id=SAVE_FAIR_MARKET_DATA_TASK_ID, func=save_fair_market_value, trigger='interval', hours=24)
-    app.cache[SP_500] = ShillerDataService.initialize_shiller_data()
+    cache.set(SP_500, ShillerDataService.initialize_shiller_data())
 
 
 # http://127.0.0.1:5000/sp-data
@@ -130,9 +129,9 @@ app.add_url_rule('/sp-data', view_func=StockDataView.as_view('stock_data'))
 @cross_origin()
 def get_valuation_data(symbol=None):
     dictionary = collections.OrderedDict()
-    dictionary['stock_valuation'] = calculate_fair_market_value()
-    dictionary['market_data'] = app.cache.get(MARKETDATA)
-    dictionary['equation_coefficients'] = app.cache.get(SP_500).get('coefficients')
+    dictionary['stock_valuation'] = FairMarketValueService.calculate_fair_market_value()
+    dictionary['market_data'] = cache.get(MARKETDATA)
+    dictionary['equation_coefficients'] = cache.get(SP_500).get('coefficients')
     dictionary['timestamp'] = datetime.now().strftime("%m/%d/%Y, %H:%M:%S")
     return json.dumps(dictionary, indent=4)
 
@@ -142,7 +141,7 @@ def get_valuation_data(symbol=None):
 def get_stock_quote(symbol=None):
     dictionary = collections.OrderedDict()
     if symbol == 'GSPC':
-        dictionary['market_quote'] = app.cache.get(SP_QUOTE)
+        dictionary['market_quote'] = cache.get(SP_QUOTE)
     else:
         dictionary['market_quote'] = stock_quote_service.download_quote(symbol, '1d', '1m')
     return json.dumps(dictionary, indent=4)
@@ -155,7 +154,7 @@ def get_historical_data(symbol=None):
     if symbol == GSPC:
         # convert GSPC to a variable
 
-        dictionary['price_fairvalue'] = app.cache.get(SP_500).get('historicaldata')
+        dictionary['price_fairvalue'] = cache.get(SP_500).get('historicaldata')
     else:
         # TODO, should do something different here
         dictionary['price_fairvalue'] = stock_quote_service.download_quote(symbol, '1d', '1m')

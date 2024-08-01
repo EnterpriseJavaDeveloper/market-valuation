@@ -12,7 +12,7 @@ from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import train_test_split
 from sklearn import metrics
 from sqlalchemy import and_, func
-from sqlalchemy.testing.plugin.plugin_base import logging
+import logging
 
 from database import db
 from model.Coefficients import Coefficients

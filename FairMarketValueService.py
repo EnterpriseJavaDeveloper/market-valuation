@@ -2,23 +2,24 @@ import logging
 import pickle
 from datetime import datetime, timedelta
 
+from caching import cache
 from database import db
-from model.Coefficients import Coefficients
 from model.Earnings import Earnings
 
 logger = logging.getLogger()
 
-from model.MarketData import MarketData
-from model.StockQuote import StockQuote
 from StockValuation import StockValuation, StockEarningsModel
-from flask import current_app, app
+from flask import current_app
 
 
 class FairMarketValueService:
 
     @classmethod
-    def calculate_fair_market_value(cls, stock_data: MarketData, regression_data: Coefficients,
-                                    stock_quote_data: StockQuote, future_earnings_data):
+    def calculate_fair_market_value(cls):
+        stock_data = cache.get('MARKETDATA')
+        regression_data = pickle.load(open('ml_model_regression.pkl', 'rb'))
+        stock_quote_data = cache.get('SP500QUOTE')
+        future_earnings_data = cache.get('FUTUREEARNINGS')
         future_earnings = future_earnings_data['latest']
         max_future_earnings = future_earnings_data['max']
         dividend = stock_quote_data.open * stock_data.div_yield / 100
@@ -79,27 +80,25 @@ class FairMarketValueService:
 
     @classmethod
     def save_fair_market_value(cls):
-        with current_app.app_context():
-            today = datetime.now().date()
-            existing_earnings = Earnings.query.filter(Earnings.event_time > today - timedelta(days=1)).first()
+        today = datetime.now().date()
+        existing_earnings = Earnings.query.filter(Earnings.event_time > today - timedelta(days=1)).first()
 
-            if existing_earnings:
-                current_app.logger.info("Earnings have already been saved for today.")
-                return
-            stock_data = current_app.cache.get('MARKETDATA')
-            coefficient_data = pickle.load(open('ml_model_regression.pkl', 'rb'))  # Adjust path as necessary
-            stock_quote_data = current_app.cache.get('SP500QUOTE')
-            future_earnings_data = current_app.cache.get('FUTUREEARNINGS')
-            stock_valuation = cls.calculate_fair_market_value(stock_data, coefficient_data,
-                                                                                 stock_quote_data, future_earnings_data)
-            earnings = Earnings(stock_valuation.current_earnings.earnings,
-                                stock_valuation.current_earnings.calculated_price,
-                                stock_valuation.future_earnings.earnings,
-                                stock_valuation.blended_earnings.earnings,
-                                stock_valuation.max_earnings.earnings, stock_valuation.future_earnings.calculated_price,
-                                stock_valuation.blended_earnings.calculated_price,
-                                stock_valuation.max_earnings.calculated_price,
-                                stock_data.treasury_yield, stock_valuation.dividend, stock_quote_data.open,
-                                datetime.now())
-            db.session.add(earnings)
-            db.session.commit()
+        if existing_earnings:
+            current_app.logger.info("Earnings have already been saved for today.")
+            return
+        stock_data = cache.get('MARKETDATA')
+        # coefficient_data = pickle.load(open('ml_model_regression.pkl', 'rb'))  # Adjust path as necessary
+        stock_quote_data = cache.get('SP500QUOTE')
+        # future_earnings_data = cache.get('FUTUREEARNINGS')
+        stock_valuation = cls.calculate_fair_market_value()
+        earnings = Earnings(stock_valuation.current_earnings.earnings,
+                            stock_valuation.current_earnings.calculated_price,
+                            stock_valuation.future_earnings.earnings,
+                            stock_valuation.blended_earnings.earnings,
+                            stock_valuation.max_earnings.earnings, stock_valuation.future_earnings.calculated_price,
+                            stock_valuation.blended_earnings.calculated_price,
+                            stock_valuation.max_earnings.calculated_price,
+                            stock_data.treasury_yield, stock_valuation.dividend, stock_quote_data.open,
+                            datetime.now())
+        db.session.add(earnings)
+        db.session.commit()
