@@ -16,6 +16,7 @@ class MarketValueService:
     future_earnings_url = 'https://ycharts.com/indicators/sp_500_earnings_per_share_forward_estimate'
 
     @classmethod
+    @cache.cached(timeout=86400, key_prefix='market_values')
     def download_market_values(cls):
         # Get Treasury yield from web
         page_soup = cls.get_page_soup(cls.treasury_url)

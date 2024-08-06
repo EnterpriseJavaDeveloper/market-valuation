@@ -96,11 +96,13 @@ def cache_market_values():
 
 
 def cache_calculated_stock_data():
-    cache.set(SP_QUOTE_CALCULATED, FairMarketValueService.calculate_fair_market_value())
+    with app.app_context():
+        cache.set(SP_QUOTE_CALCULATED, FairMarketValueService.calculate_fair_market_value())
 
 
 def save_fair_market_value():
-    fair_market_value_service.save_fair_market_value()
+    with app.app_context():
+        fair_market_value_service.save_fair_market_value()
 
 
 with app.app_context():
@@ -118,7 +120,7 @@ with app.app_context():
     scheduler.add_job(id=FUTURE_VALUE_INTERVAL_TASK_ID, func=download_future_earnings, trigger='interval', hours=24)
     scheduler.add_job(id=VALUATION_INTERVAL_TASK_ID, func=cache_calculated_stock_data, trigger='interval', hours=24)
     scheduler.add_job(id=SAVE_FAIR_MARKET_DATA_TASK_ID, func=save_fair_market_value, trigger='interval', hours=24)
-    cache.set(SP_500, ShillerDataService.initialize_shiller_data())
+    ShillerDataService.initialize_shiller_data()
 
 
 # http://127.0.0.1:5000/sp-data
@@ -130,8 +132,9 @@ app.add_url_rule('/sp-data', view_func=StockDataView.as_view('stock_data'))
 def get_valuation_data(symbol=None):
     dictionary = collections.OrderedDict()
     dictionary['stock_valuation'] = FairMarketValueService.calculate_fair_market_value()
-    dictionary['market_data'] = cache.get(MARKETDATA)
-    dictionary['equation_coefficients'] = cache.get(SP_500).get('coefficients')
+    dictionary['market_data'] = MarketValueService.download_market_values()
+    coefficients = coefficients_schema.dump(ShillerDataService.initialize_shiller_data().get('coefficients'))
+    dictionary['equation_coefficients'] = coefficients  # Convert to dictionary
     dictionary['timestamp'] = datetime.now().strftime("%m/%d/%Y, %H:%M:%S")
     return json.dumps(dictionary, indent=4)
 
@@ -141,7 +144,7 @@ def get_valuation_data(symbol=None):
 def get_stock_quote(symbol=None):
     dictionary = collections.OrderedDict()
     if symbol == 'GSPC':
-        dictionary['market_quote'] = cache.get(SP_QUOTE)
+        dictionary['market_quote'] = stock_quote_service.download_quote('^GSPC', '1d', '1m')
     else:
         dictionary['market_quote'] = stock_quote_service.download_quote(symbol, '1d', '1m')
     return json.dumps(dictionary, indent=4)
@@ -153,8 +156,7 @@ def get_historical_data(symbol=None):
     dictionary = collections.OrderedDict()
     if symbol == GSPC:
         # convert GSPC to a variable
-
-        dictionary['price_fairvalue'] = cache.get(SP_500).get('historicaldata')
+        dictionary['price_fairvalue'] = ShillerDataService.initialize_shiller_data().get('historicaldata')
     else:
         # TODO, should do something different here
         dictionary['price_fairvalue'] = stock_quote_service.download_quote(symbol, '1d', '1m')

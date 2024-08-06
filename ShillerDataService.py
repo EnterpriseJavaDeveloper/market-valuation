@@ -14,6 +14,7 @@ from sklearn import metrics
 from sqlalchemy import and_, func
 import logging
 
+from caching import cache
 from database import db
 from model.Coefficients import Coefficients
 from model.RegressionData import RegressionData
@@ -26,6 +27,7 @@ class ShillerDataService:
     shiller_df = pd.DataFrame()
 
     @classmethod
+    @cache.cached(timeout=86400, key_prefix='shiller_data')
     def initialize_shiller_data(cls):
         use_existing = cls.download_shiller_data()
 

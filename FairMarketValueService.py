@@ -2,24 +2,24 @@ import logging
 import pickle
 from datetime import datetime, timedelta
 
-from caching import cache
+from MarketValueService import MarketValueService
+from StockQuoteService import StockQuoteService
 from database import db
 from model.Earnings import Earnings
-
-logger = logging.getLogger()
-
 from StockValuation import StockValuation, StockEarningsModel
 from flask import current_app
+
+logger = logging.getLogger()
 
 
 class FairMarketValueService:
 
     @classmethod
     def calculate_fair_market_value(cls):
-        stock_data = cache.get('MARKETDATA')
+        stock_data = MarketValueService.download_market_values()
         regression_data = pickle.load(open('ml_model_regression.pkl', 'rb'))
-        stock_quote_data = cache.get('SP500QUOTE')
-        future_earnings_data = cache.get('FUTUREEARNINGS')
+        stock_quote_data = StockQuoteService.download_quote('^GSPC', '1d', '1m')
+        future_earnings_data = MarketValueService.download_future_earnings()
         future_earnings = future_earnings_data['latest']
         max_future_earnings = future_earnings_data['max']
         dividend = stock_quote_data.open * stock_data.div_yield / 100
@@ -31,19 +31,29 @@ class FairMarketValueService:
             f'Future Earnings: {future_earnings}\t'
             f'Blended Earnings: {blended_earnings}\t'
             f'Max Earnings: {max_future_earnings}')
-        calculated_price = regression_data.intercept + (regression_data.treasury * stock_data.treasury_yield) \
-                           + (regression_data.dividend * dividend) + (regression_data.earnings * earnings)
-        future_calculated_price = regression_data.intercept + (
-                regression_data.treasury * stock_data.treasury_yield) \
-                                  + (regression_data.dividend * dividend) + (
-                                          regression_data.earnings * future_earnings)
-        blended_calculated_price = regression_data.intercept + (
-                regression_data.treasury * stock_data.treasury_yield) \
-                                   + (regression_data.dividend * dividend) + (
-                                           regression_data.earnings * blended_earnings)
-        max_calculated_price = regression_data.intercept + (regression_data.treasury * stock_data.treasury_yield) \
-                               + (regression_data.dividend * dividend) + (
-                                       regression_data.earnings * max_future_earnings)
+        # intercept = regression_data.get('intercept')
+        # treasury_coefficient = regression_data.get('treasury')
+        # dividend_coefficient = regression_data.get('dividend')
+        # earnings_coefficient = regression_data.get('earnings')
+
+        intercept = regression_data.intercept
+        treasury_coefficient = regression_data.treasury
+        dividend_coefficient = regression_data.dividend
+        earnings_coefficient = regression_data.earnings
+
+        calculated_price = intercept + (treasury_coefficient * stock_data.treasury_yield) \
+                           + (dividend_coefficient * dividend) + (earnings_coefficient * earnings)
+        future_calculated_price = intercept + (
+                treasury_coefficient * stock_data.treasury_yield) \
+                                  + (dividend_coefficient * dividend) + (
+                                          earnings_coefficient * future_earnings)
+        blended_calculated_price = intercept + (
+                treasury_coefficient * stock_data.treasury_yield) \
+                                   + (dividend_coefficient * dividend) + (
+                                           earnings_coefficient * blended_earnings)
+        max_calculated_price = intercept + (treasury_coefficient * stock_data.treasury_yield) \
+                               + (dividend_coefficient * dividend) + (
+                                       earnings_coefficient * max_future_earnings)
         valued = cls.value_calculation(stock_quote_data.open, calculated_price)
         current_earnings_model = StockEarningsModel(earnings, "Trailing earnings", calculated_price, valued["valued"],
                                                     valued["diff"])
@@ -80,18 +90,19 @@ class FairMarketValueService:
 
     @classmethod
     def save_fair_market_value(cls):
-        today = datetime.now().date()
-        existing_earnings = Earnings.query.filter(Earnings.event_time > today - timedelta(days=1)).first()
+        with current_app.app_context():
 
-        if existing_earnings:
-            current_app.logger.info("Earnings have already been saved for today.")
-            return
-        stock_data = cache.get('MARKETDATA')
-        # coefficient_data = pickle.load(open('ml_model_regression.pkl', 'rb'))  # Adjust path as necessary
-        stock_quote_data = cache.get('SP500QUOTE')
-        # future_earnings_data = cache.get('FUTUREEARNINGS')
-        stock_valuation = cls.calculate_fair_market_value()
-        earnings = Earnings(stock_valuation.current_earnings.earnings,
+            today = datetime.now().date()
+            db.session.begin()
+            existing_earnings = Earnings.query.filter(Earnings.event_time > today - timedelta(days=1)).first()
+
+            if existing_earnings:
+                current_app.logger.info("Earnings have already been saved for today.")
+                return
+            stock_data = MarketValueService.download_future_earnings()
+            stock_quote_data = StockQuoteService.download_quote('^GSPC', '1d', '1m')
+            stock_valuation = cls.calculate_fair_market_value()
+            earnings = Earnings(stock_valuation.current_earnings.earnings,
                             stock_valuation.current_earnings.calculated_price,
                             stock_valuation.future_earnings.earnings,
                             stock_valuation.blended_earnings.earnings,
@@ -100,5 +111,5 @@ class FairMarketValueService:
                             stock_valuation.max_earnings.calculated_price,
                             stock_data.treasury_yield, stock_valuation.dividend, stock_quote_data.open,
                             datetime.now())
-        db.session.add(earnings)
-        db.session.commit()
+            db.session.add(earnings)
+            db.session.commit()

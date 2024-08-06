@@ -1,5 +1,6 @@
 import yfinance as yf
 
+from caching import cache
 from model.StockQuote import StockQuote
 from flask import current_app
 
@@ -7,6 +8,7 @@ from flask import current_app
 class StockQuoteService:
 
     @classmethod
+    @cache.cached(timeout=120, key_prefix='download_quote')
     def download_quote(cls, tickers, period, interval):
         num_quotes = tickers.upper().split(',')
         size = len(num_quotes);
