@@ -15,7 +15,7 @@ class EarningsSchema(Schema):
     treasury_yield = fields.Float()
     dividend = fields.Float()
     current_price = fields.Float()
-    event_time = fields.DateTime()
+    event_time = fields.String()
 
     @post_load
     def make_earnings(self, data, **kwargs):

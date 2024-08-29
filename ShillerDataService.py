@@ -25,6 +25,8 @@ class ShillerDataService:
     # schiller_data_url = "http://www.econ.yale.edu//~shiller/data/ie_data.xls"
     file = "shiller.xls"
     shiller_df = pd.DataFrame()
+    incomplete_data = pd.DataFrame()
+    last_date = ''
 
     @classmethod
     @cache.cached(timeout=86400, key_prefix='shiller_data')
@@ -63,7 +65,9 @@ class ShillerDataService:
             file = open('ml_model_regression.pkl', 'rb')
             coefficient_data = pickle.load(file)
             historical_data = pickle.load(file)
-            return {'coefficients': coefficient_data, 'historicaldata': historical_data}
+            last_date = pickle.load(file)
+            print (last_date)
+            return {'coefficients': coefficient_data, 'historicaldata': historical_data, 'lastdate': last_date}
         return regression_data
 
     @classmethod
@@ -88,14 +92,17 @@ class ShillerDataService:
             df['Dividend'].replace('', np.nan, inplace=True)
             df['Earnings'].replace('', np.nan, inplace=True)
             df['E'].replace('', np.nan, inplace=True)
+            cls.incomplete_data = df[df[['Dividend', 'Earnings', 'D', 'E']].isna().any(axis=1)]
             df.dropna(subset=['Dividend', 'Earnings', 'D', 'E'], inplace=True)
             df['Date'] = df['Date'].astype(str).replace('\.', '/', regex=True).apply(lambda x: x + '0' if len(x) == 6 else x).apply(lambda x: x + '/01')
-
+            last_date = df['Date'].iloc[-1]
+            print(last_date)
             # drop all rows before Jan 1, 1960
             # i = 1068
             i = df.index[df['Date'] == '1900/01/01'].tolist()[0]
             # i = 4
             cls.shiller_df = df.drop(df.index[:i])
+            cls.last_date = last_date
         return use_existing
 
     @classmethod
@@ -116,8 +123,9 @@ class ShillerDataService:
         file = open('ml_model_fitted.pkl', 'wb')
         pickle.dump(coefficient_data, file)
         pickle.dump(regression_data['price_fairvalue'], file)
+        pickle.dump(cls.last_date, file)
         file.close()
-        return {'coefficients': coefficient_data, 'historicaldata': regression_data['price_fairvalue']}
+        return {'coefficients': coefficient_data, 'historicaldata': regression_data['price_fairvalue'], 'lastdate': cls.last_date}
 
     @classmethod
     def get_ml_regression_data(cls):
@@ -140,12 +148,15 @@ class ShillerDataService:
         price_fairvalue = price_fairvalue.rename(columns={'p': 'actualprice', 'd': 'actualdividend', 'e': 'actualearnings'})
         price_fairvalue['valuation'] = (price_fairvalue['price'] / price_fairvalue['fairvalue'] )
         regression_data = RegressionData(price_fairvalue)
+        missing_data = RegressionData(cls.incomplete_data)
         coefficient_data = Coefficients('SP_500', mlr.intercept_, treasury_coef, earnings_coef, dividend_coef, datetime.now())
         file = open('ml_model_regression.pkl', 'wb')
         pickle.dump(coefficient_data, file)
         pickle.dump(regression_data['price_fairvalue'], file)
+        pickle.dump(cls.last_date, file)
+        pickle.dump(missing_data, file)
         file.close()
-        return {'coefficients': coefficient_data, 'historicaldata': regression_data['price_fairvalue']}
+        return {'coefficients': coefficient_data, 'historicaldata': regression_data['price_fairvalue'], 'lastdate': cls.last_date}
 
 
 

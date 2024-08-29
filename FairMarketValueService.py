@@ -99,7 +99,7 @@ class FairMarketValueService:
             if existing_earnings:
                 current_app.logger.info("Earnings have already been saved for today.")
                 return
-            stock_data = MarketValueService.download_future_earnings()
+            stock_data = MarketValueService.download_market_values()
             stock_quote_data = StockQuoteService.download_quote('^GSPC', '1d', '1m')
             stock_valuation = cls.calculate_fair_market_value()
             earnings = Earnings(stock_valuation.current_earnings.earnings,

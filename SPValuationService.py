@@ -155,11 +155,45 @@ def get_stock_quote(symbol=None):
 def get_historical_data(symbol=None):
     dictionary = collections.OrderedDict()
     if symbol == GSPC:
-        # convert GSPC to a variable
-        dictionary['price_fairvalue'] = ShillerDataService.initialize_shiller_data().get('historicaldata')
+        # Retrieve historical data
+        historical_data = ShillerDataService.initialize_shiller_data().get('historicaldata')
+        dictionary['price_fairvalue'] = historical_data
+
+        # Retrieve last_date
+        last_date_str = ShillerDataService.initialize_shiller_data().get('lastdate')
+
+        if last_date_str:
+            # Convert last_date to datetime object
+            last_date = datetime.strptime(last_date_str, '%Y/%m/%d')
+            # Query Earnings table for rows with event_time greater than last_date
+            earnings = Earnings.query.filter(Earnings.event_time > last_date).all()
+
+            # Filter earnings to ensure event_time month is greater than last_date month
+            earnings = [e for e in earnings if e.event_time.month > last_date.month]
+
+            # Group by month and year, and get the last row of each group
+            from itertools import groupby
+            from operator import attrgetter
+
+            earnings.sort(key=attrgetter('event_time'))
+            grouped_earnings = []
+            for key, group in groupby(earnings, key=lambda x: (x.event_time.year, x.event_time.month)):
+                last_row = list(group)[-1]
+                grouped_earnings.append(last_row)
+
+            # Convert event_time to YYYY/mm/dd format
+            for earning in grouped_earnings:
+                earning.event_time = earning.event_time.replace(day=1).strftime('%Y/%m/%d')
+
+            # Convert to dictionary format
+            earnings_schema = EarningsSchema(many=True)
+            earnings_dict = earnings_schema.dump(grouped_earnings)
+
+            # Add to dictionary
+            dictionary['calculated_price_fairvalue'] = earnings_dict
     else:
-        # TODO, should do something different here
         dictionary['price_fairvalue'] = stock_quote_service.download_quote(symbol, '1d', '1m')
+
     return json.dumps(dictionary, indent=4)
 
 
