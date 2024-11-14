@@ -102,14 +102,14 @@ class FairMarketValueService:
             stock_data = MarketValueService.download_market_values()
             stock_quote_data = StockQuoteService.download_quote('^GSPC', '1d', '1m')
             stock_valuation = cls.calculate_fair_market_value()
-            earnings = Earnings(stock_valuation.current_earnings.earnings,
-                            stock_valuation.current_earnings.calculated_price,
+            earnings = Earnings(stock_valuation.current_earnings.earnings.item(),
+                            stock_valuation.current_earnings.calculated_price.item(),
                             stock_valuation.future_earnings.earnings,
-                            stock_valuation.blended_earnings.earnings,
-                            stock_valuation.max_earnings.earnings, stock_valuation.future_earnings.calculated_price,
-                            stock_valuation.blended_earnings.calculated_price,
-                            stock_valuation.max_earnings.calculated_price,
-                            stock_data.treasury_yield, stock_valuation.dividend, stock_quote_data.open,
+                            stock_valuation.blended_earnings.earnings.item(),
+                            stock_valuation.max_earnings.earnings.item(), stock_valuation.future_earnings.calculated_price.item(),
+                            stock_valuation.blended_earnings.calculated_price.item(),
+                            stock_valuation.max_earnings.calculated_price.item(),
+                            stock_data.treasury_yield, stock_valuation.dividend.item(), stock_quote_data.open.item(),
                             datetime.now())
             db.session.add(earnings)
             db.session.commit()
