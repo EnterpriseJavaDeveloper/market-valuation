@@ -1,4 +1,6 @@
 import urllib.request as ul
+from io import StringIO
+
 import pandas as pd
 import requests
 from bs4 import BeautifulSoup as soup
@@ -53,7 +55,7 @@ class MarketValueService:
             "X-Requested-With": "XMLHttpRequest"
         }
         r = requests.get(cls.future_earnings_url, headers=header)
-        df = pd.read_html(r.text)
+        df = pd.read_html(StringIO(r.text))
         df_new = df[5].merge(df[6], how='outer')
         df_new['FormattedDate'] = pd.to_datetime(df_new['Date'])
         df_new = df_new.sort_values(by='FormattedDate')

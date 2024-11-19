@@ -4,8 +4,8 @@ from datetime import datetime, timedelta
 
 from flask import Flask, request
 from flask.logging import default_handler
-# from flask_cors import Flask, request
 from flask_apscheduler import APScheduler
+# from flask_cors import Flask, request
 # from flask_cors.logging import default_handler
 
 from flask_marshmallow import Marshmallow
@@ -221,6 +221,6 @@ def login():
 
 
 # app.run(debug=False)
-if __name__ == '__main__':
-    app.run()
+# if __name__ == '__main__':
+#     app.run()
     # socketio.run(app)

@@ -15,8 +15,9 @@ class StockQuoteService:
         data = yf.download(tickers=tickers, period=period, interval=interval)
         latest_quote = data.tail(1)
         if size == 1:
-            stock_quote = StockQuote(latest_quote['Open'][0], latest_quote['High'][0], latest_quote['Low'][0],
-                                 latest_quote['Close'][0])
+            #Todo extract the values from the dataframe properly
+            stock_quote = StockQuote(latest_quote['Open'].values[0][0], latest_quote['High'].values[0][0], latest_quote['Low'].values[0][0],
+                                 latest_quote['Close'].values[0][0])
         else:
             current_app.logger.info('more than 1, not yet supported')
 
