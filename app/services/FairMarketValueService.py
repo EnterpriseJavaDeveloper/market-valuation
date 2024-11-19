@@ -2,13 +2,12 @@ import logging
 import pickle
 from datetime import datetime, timedelta
 
-from MarketValueService import MarketValueService
-from StockQuoteService import StockQuoteService
+from app.services.MarketValueService import MarketValueService
+from app.services.StockQuoteService import StockQuoteService
 from database import db
-from model.Earnings import Earnings
+from app.models import Earnings
 from StockValuation import StockValuation, StockEarningsModel
 from flask import current_app
-
 logger = logging.getLogger()
 
 
@@ -17,7 +16,7 @@ class FairMarketValueService:
     @classmethod
     def calculate_fair_market_value(cls):
         stock_data = MarketValueService.download_market_values()
-        regression_data = pickle.load(open('ml_model_regression.pkl', 'rb'))
+        regression_data = pickle.load(open('../../ml_model_regression.pkl', 'rb'))
         stock_quote_data = StockQuoteService.download_quote('^GSPC', '1d', '1m')
         future_earnings_data = MarketValueService.download_future_earnings()
         future_earnings = future_earnings_data['latest']
@@ -91,10 +90,9 @@ class FairMarketValueService:
     @classmethod
     def save_fair_market_value(cls):
         with current_app.app_context():
-
             today = datetime.now().date()
             db.session.begin()
-            existing_earnings = Earnings.query.filter(Earnings.event_time > today - timedelta(days=1)).first()
+            existing_earnings = db.session.query(Earnings).filter(Earnings.event_time > today - timedelta(days=1)).first()
 
             if existing_earnings:
                 current_app.logger.info("Earnings have already been saved for today.")

@@ -1,15 +1,18 @@
+# app/views/StockDataView.py
+
+from flask import Blueprint
 from flask.views import MethodView
-from FairMarketValueService import FairMarketValueService
-from MarketValueService import MarketValueService
-from ShillerDataService import ShillerDataService
-from schema.coefficients_schema import CoefficientsSchema
+from app.services.FairMarketValueService import FairMarketValueService
+from app.services.MarketValueService import MarketValueService
+from app.services.ShillerDataService import ShillerDataService
+from app.schemas.coefficients_schema import CoefficientsSchema
 from flask_cors import cross_origin
 import collections
 import json
 from datetime import datetime
 
+bp = Blueprint('stock_data_view', __name__)
 coefficients_schema = CoefficientsSchema(many=False)
-
 
 class StockDataView(MethodView):
     @cross_origin()
@@ -22,4 +25,4 @@ class StockDataView(MethodView):
         dictionary['timestamp'] = datetime.now().strftime("%m/%d/%Y, %H:%M:%S")
         return json.dumps(dictionary, indent=4)
 
-
+bp.add_url_rule('/stock-data', view_func=StockDataView.as_view('stock_data'))

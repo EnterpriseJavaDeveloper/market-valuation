@@ -2,7 +2,7 @@ from database import db
 
 
 class Earnings(db.Model):
-    Id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(db.Integer, primary_key=True)
     calculated_earnings = db.Column(db.Float)
     calculated_price = db.Column(db.Float)
     future_earnings = db.Column(db.Float)

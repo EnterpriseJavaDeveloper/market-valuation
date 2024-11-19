@@ -6,7 +6,7 @@ from werkzeug.security import check_password_hash
 
 from flask import current_app
 
-from model.Users import Users
+from app.models.Users import Users
 
 # users = {
 #     "user1": "password_hash1",

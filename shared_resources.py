@@ -1,6 +1,4 @@
-import pickle
-from flask import current_app as app
-from FairMarketValueService import FairMarketValueService
+from app.services.FairMarketValueService import FairMarketValueService
 
 fair_market_value_service = FairMarketValueService()
 

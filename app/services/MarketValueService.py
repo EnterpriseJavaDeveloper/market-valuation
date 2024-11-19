@@ -5,7 +5,7 @@ from bs4 import BeautifulSoup as soup
 from datetime import date
 
 from caching import cache
-from model.MarketData import MarketData
+from app.models.MarketData import MarketData
 
 
 class MarketValueService:
@@ -16,7 +16,7 @@ class MarketValueService:
     future_earnings_url = 'https://ycharts.com/indicators/sp_500_earnings_per_share_forward_estimate'
 
     @classmethod
-    @cache.cached(timeout=86400, key_prefix='market_values')
+    # @cache.cached(timeout=86400, key_prefix='market_values')
     def download_market_values(cls):
         # Get Treasury yield from web
         page_soup = cls.get_page_soup(cls.treasury_url)
@@ -46,7 +46,7 @@ class MarketValueService:
         return item_locator.contents[2].text.strip()
 
     @classmethod
-    @cache.cached(timeout=86400, key_prefix='future_earnings')
+    # @cache.cached(timeout=86400, key_prefix='future_earnings')
     def download_future_earnings(cls):
         header = {
             "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.75 Safari/537.36",

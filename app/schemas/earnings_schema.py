@@ -1,5 +1,5 @@
 from marshmallow import Schema, fields, post_load
-from model.Earnings import Earnings
+from app.models.Earnings import Earnings
 
 
 class EarningsSchema(Schema):
