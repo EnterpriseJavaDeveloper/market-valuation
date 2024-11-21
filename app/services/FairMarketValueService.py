@@ -17,7 +17,7 @@ class FairMarketValueService:
     @classmethod
     def calculate_fair_market_value(cls):
         stock_data = MarketValueService.download_market_values()
-        regression_data = pickle.load(open('ml_model_regression.pkl', 'rb'))
+        regression_data = pickle.load(open('../ml_model_regression.pkl', 'rb'))
         stock_quote_data = StockQuoteService.download_quote('^GSPC', '1d', '1m')
         future_earnings_data = MarketValueService.download_future_earnings()
         future_earnings = future_earnings_data['latest']

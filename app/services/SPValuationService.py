@@ -12,13 +12,14 @@ from flask_marshmallow import Marshmallow
 from dotenv import load_dotenv
 import os
 
+from app import SP_QUOTE, FUTURE_EARNINGS, MARKETDATA, SP_QUOTE_CALCULATED
 from endpoints.AuthService import AuthService
 from model.Earnings import Earnings
 # from flask_socketio import SocketIO, emit
 from flask_cors import cross_origin
 
 from schema.earnings_schema import EarningsSchema
-from FairMarketValueService import FairMarketValueService
+from app.services.FairMarketValueService import FairMarketValueService
 from views import StockDataView
 
 from MarketValueService import MarketValueService
@@ -30,15 +31,15 @@ from schema.coefficients_schema import CoefficientsSchema
 from database import db
 from caching import cache
 
-GSPC = 'GSPC'
-
+# GSPC = 'GSPC'
+#
 collections.Iterable = collections.abc.Iterable
-
-SP_500 = 'SP500'
-FUTURE_EARNINGS = 'FUTUREEARNINGS'
-MARKETDATA = 'MARKETDATA'
-SP_QUOTE = 'SP500QUOTE'
-SP_QUOTE_CALCULATED = 'SP500QUOTECALCULATED'
+#
+# SP_500 = 'SP500'
+# FUTURE_EARNINGS = 'FUTUREEARNINGS'
+# MARKETDATA = 'MARKETDATA'
+# SP_QUOTE = 'SP500QUOTE'
+# SP_QUOTE_CALCULATED = 'SP500QUOTECALCULATED'
 
 app = Flask(__name__)
 load_dotenv()

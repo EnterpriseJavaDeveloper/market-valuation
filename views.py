@@ -1,5 +1,5 @@
 from flask.views import MethodView
-from FairMarketValueService import FairMarketValueService
+from app.services.FairMarketValueService import FairMarketValueService
 from MarketValueService import MarketValueService
 from ShillerDataService import ShillerDataService
 from schema.coefficients_schema import CoefficientsSchema
