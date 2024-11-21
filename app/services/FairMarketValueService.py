@@ -2,7 +2,7 @@ import logging
 import pickle
 from datetime import datetime, timedelta
 
-from MarketValueService import MarketValueService
+from app.services.MarketValueService import MarketValueService
 from StockQuoteService import StockQuoteService
 from database import db
 from model.Earnings import Earnings

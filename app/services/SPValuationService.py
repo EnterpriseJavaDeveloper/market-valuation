@@ -22,7 +22,7 @@ from schema.earnings_schema import EarningsSchema
 from app.services.FairMarketValueService import FairMarketValueService
 from views import StockDataView
 
-from MarketValueService import MarketValueService
+from app.services.MarketValueService import MarketValueService
 from ShillerDataService import ShillerDataService
 import collections
 
