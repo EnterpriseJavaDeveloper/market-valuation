@@ -1,7 +1,7 @@
 import yfinance as yf
 
 from caching import cache
-from model.StockQuote import StockQuote
+from app.models.StockQuote import StockQuote
 from flask import current_app
 
 

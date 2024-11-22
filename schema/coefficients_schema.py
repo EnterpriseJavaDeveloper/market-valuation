@@ -1,6 +1,6 @@
 from marshmallow import Schema, fields, post_load
 
-from model.Coefficients import Coefficients
+from app.models.Coefficients import Coefficients
 
 
 class CoefficientsSchema(Schema):

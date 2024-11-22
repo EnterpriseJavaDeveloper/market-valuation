@@ -16,14 +16,14 @@ import logging
 
 from caching import cache
 from database import db
-from model.Coefficients import Coefficients
-from model.RegressionData import RegressionData
+from app.models.Coefficients import Coefficients
+from app.models.RegressionData import RegressionData
 
 
 class ShillerDataService:
     schiller_data_url = "https://img1.wsimg.com/blobby/go/e5e77e0b-59d1-44d9-ab25-4763ac982e53/downloads/ie_data.xls"
     # schiller_data_url = "http://www.econ.yale.edu//~shiller/data/ie_data.xls"
-    file = "../../shiller.xls"
+    file = "../shiller.xls"
     shiller_df = pd.DataFrame()
     incomplete_data = pd.DataFrame()
     last_date = ''
@@ -37,15 +37,20 @@ class ShillerDataService:
             regression_data = cls.get_ml_regression_data()
             # regression_data = cls.get_fitted_regression_data()
 
+            treasury = float(regression_data['coefficients'].treasury)
+            dividend = float(regression_data['coefficients'].dividend)
+            earnings = float(regression_data['coefficients'].earnings)
+            intercept = float(regression_data['coefficients'].intercept)
+
             with current_app.app_context():
                 logger = logging.getLogger(__name__)
 
                 query = db.session.query(Coefficients)
                 query = query.filter(
                     and_(
-                        Coefficients.treasury == regression_data['coefficients'].treasury,
-                        Coefficients.dividend == regression_data['coefficients'].dividend,
-                        Coefficients.earnings == regression_data['coefficients'].earnings
+                        Coefficients.treasury == treasury,
+                        Coefficients.dividend == dividend,
+                        Coefficients.earnings ==earnings
                     )
                 )
                 query = query.with_entities(func.count())
@@ -53,10 +58,10 @@ class ShillerDataService:
                 logger.info(f"Executing query: {query_str}")
                 coefficient_count = query.scalar()
                 if coefficient_count == 0:
-                    regression_values = Coefficients("S&P 500", regression_data['coefficients'].intercept,
-                                                     regression_data['coefficients'].treasury,
-                                                     regression_data['coefficients'].earnings,
-                                                     regression_data['coefficients'].dividend,
+                    regression_values = Coefficients("S&P 500", intercept,
+                                                     treasury,
+                                                     earnings,
+                                                     dividend,
                                                      regression_data['coefficients'].create_date)
                     db.session.add(regression_values)
                     db.session.commit()
@@ -88,13 +93,13 @@ class ShillerDataService:
 
         if not use_existing:
             df = pd.read_excel(cls.file, sheet_name='Data', skiprows=range(0, 7), skipfooter=1, usecols='A:D,G:I,K')
-            df['D'].replace('', np.nan, inplace=True)
-            df['Dividend'].replace('', np.nan, inplace=True)
-            df['Earnings'].replace('', np.nan, inplace=True)
-            df['E'].replace('', np.nan, inplace=True)
+            df.replace({'D',''}, np.nan, inplace=True)
+            df.replace({'Dividend',''}, np.nan, inplace=True)
+            df.replace({'Earnings', ''}, np.nan, inplace=True)
+            df.replace({'E', ''}, np.nan, inplace=True)
             cls.incomplete_data = df[df[['Dividend', 'Earnings', 'D', 'E']].isna().any(axis=1)]
             df.dropna(subset=['Dividend', 'Earnings', 'D', 'E'], inplace=True)
-            df['Date'] = df['Date'].astype(str).replace('\.', '/', regex=True).apply(lambda x: x + '0' if len(x) == 6 else x).apply(lambda x: x + '/01')
+            df['Date'] = df['Date'].astype(str).replace(r'\.', '/', regex=True).apply(lambda x: x + '0' if len(x) == 6 else x).apply(lambda x: x + '/01')
             last_date = df['Date'].iloc[-1]
             print(last_date)
             # drop all rows before Jan 1, 1960
@@ -150,7 +155,7 @@ class ShillerDataService:
         regression_data = RegressionData(price_fairvalue)
         missing_data = RegressionData(cls.incomplete_data)
         coefficient_data = Coefficients('SP_500', mlr.intercept_, treasury_coef, earnings_coef, dividend_coef, datetime.now())
-        file = open('../../ml_model_regression.pkl', 'wb')
+        file = open('../ml_model_regression.pkl', 'wb')
         pickle.dump(coefficient_data, file)
         pickle.dump(regression_data['price_fairvalue'], file)
         pickle.dump(cls.last_date, file)

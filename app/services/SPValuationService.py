@@ -14,7 +14,7 @@ import os
 
 from app import SP_QUOTE, FUTURE_EARNINGS, MARKETDATA, SP_QUOTE_CALCULATED
 from endpoints.AuthService import AuthService
-from model.Earnings import Earnings
+from app.models.Earnings import Earnings
 # from flask_socketio import SocketIO, emit
 from flask_cors import cross_origin
 

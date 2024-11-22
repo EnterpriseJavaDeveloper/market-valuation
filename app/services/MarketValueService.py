@@ -7,7 +7,7 @@ from bs4 import BeautifulSoup as soup
 from datetime import date
 
 from caching import cache
-from model.MarketData import MarketData
+from app.models.MarketData import MarketData
 
 
 class MarketValueService:
