@@ -18,7 +18,7 @@ from app.models.Earnings import Earnings
 # from flask_socketio import SocketIO, emit
 from flask_cors import cross_origin
 
-from schema.earnings_schema import EarningsSchema
+from app.schemas.earnings_schema import EarningsSchema
 from app.services.FairMarketValueService import FairMarketValueService
 from views import StockDataView
 
@@ -27,7 +27,7 @@ from app.services.ShillerDataService import ShillerDataService
 import collections
 
 from app.services.StockQuoteService import StockQuoteService
-from schema.coefficients_schema import CoefficientsSchema
+from app.schemas.coefficients_schema import CoefficientsSchema
 from database import db
 from caching import cache
 
