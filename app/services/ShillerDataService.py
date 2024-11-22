@@ -23,7 +23,7 @@ from model.RegressionData import RegressionData
 class ShillerDataService:
     schiller_data_url = "https://img1.wsimg.com/blobby/go/e5e77e0b-59d1-44d9-ab25-4763ac982e53/downloads/ie_data.xls"
     # schiller_data_url = "http://www.econ.yale.edu//~shiller/data/ie_data.xls"
-    file = "shiller.xls"
+    file = "../../shiller.xls"
     shiller_df = pd.DataFrame()
     incomplete_data = pd.DataFrame()
     last_date = ''
@@ -62,7 +62,7 @@ class ShillerDataService:
                     db.session.commit()
         else:
             print('Using existing model')
-            file = open('ml_model_regression.pkl', 'rb')
+            file = open('../ml_model_regression.pkl', 'rb')
             coefficient_data = pickle.load(file)
             historical_data = pickle.load(file)
             last_date = pickle.load(file)
@@ -150,7 +150,7 @@ class ShillerDataService:
         regression_data = RegressionData(price_fairvalue)
         missing_data = RegressionData(cls.incomplete_data)
         coefficient_data = Coefficients('SP_500', mlr.intercept_, treasury_coef, earnings_coef, dividend_coef, datetime.now())
-        file = open('ml_model_regression.pkl', 'wb')
+        file = open('../../ml_model_regression.pkl', 'wb')
         pickle.dump(coefficient_data, file)
         pickle.dump(regression_data['price_fairvalue'], file)
         pickle.dump(cls.last_date, file)

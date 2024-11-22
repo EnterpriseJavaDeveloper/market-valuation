@@ -1,7 +1,7 @@
 from flask.views import MethodView
 from app.services.FairMarketValueService import FairMarketValueService
 from app.services.MarketValueService import MarketValueService
-from ShillerDataService import ShillerDataService
+from app.services.ShillerDataService import ShillerDataService
 from schema.coefficients_schema import CoefficientsSchema
 from flask_cors import cross_origin
 import collections

@@ -23,10 +23,10 @@ from app.services.FairMarketValueService import FairMarketValueService
 from views import StockDataView
 
 from app.services.MarketValueService import MarketValueService
-from ShillerDataService import ShillerDataService
+from app.services.ShillerDataService import ShillerDataService
 import collections
 
-from StockQuoteService import StockQuoteService
+from app.services.StockQuoteService import StockQuoteService
 from schema.coefficients_schema import CoefficientsSchema
 from database import db
 from caching import cache
