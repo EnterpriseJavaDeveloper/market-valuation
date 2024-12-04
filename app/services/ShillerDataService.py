@@ -14,7 +14,7 @@ from sklearn import metrics
 from sqlalchemy import and_, func
 import logging
 
-from caching import cache
+from app.shared.caching import cache
 from database import db
 from app.models.Coefficients import Coefficients
 from app.models.RegressionData import RegressionData

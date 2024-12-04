@@ -6,7 +6,7 @@ from app.services.MarketValueService import MarketValueService
 from app.services.StockQuoteService import StockQuoteService
 from database import db
 from app.models.Earnings import Earnings
-from StockValuation import StockValuation, StockEarningsModel
+from app.models.StockValuation import StockValuation, StockEarningsModel
 from flask import current_app
 
 logger = logging.getLogger()

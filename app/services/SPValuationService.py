@@ -12,7 +12,7 @@ from flask_marshmallow import Marshmallow
 from dotenv import load_dotenv
 import os
 
-from app import SP_QUOTE, FUTURE_EARNINGS, MARKETDATA, SP_QUOTE_CALCULATED
+from app import SP_QUOTE, FUTURE_EARNINGS, MARKETDATA, SP_QUOTE_CALCULATED, GSPC
 from app.endpoints.AuthService import AuthService
 from app.models.Earnings import Earnings
 # from flask_socketio import SocketIO, emit
@@ -20,7 +20,7 @@ from flask_cors import cross_origin
 
 from app.schemas.earnings_schema import EarningsSchema
 from app.services.FairMarketValueService import FairMarketValueService
-from views import StockDataView
+from app.views.stock_data_view import StockDataView
 
 from app.services.MarketValueService import MarketValueService
 from app.services.ShillerDataService import ShillerDataService
@@ -29,7 +29,7 @@ import collections
 from app.services.StockQuoteService import StockQuoteService
 from app.schemas.coefficients_schema import CoefficientsSchema
 from database import db
-from caching import cache
+from app.shared.caching import cache
 
 # GSPC = 'GSPC'
 #

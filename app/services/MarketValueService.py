@@ -6,7 +6,7 @@ import requests
 from bs4 import BeautifulSoup as soup
 from datetime import date
 
-from caching import cache
+from app.shared.caching import cache
 from app.models.MarketData import MarketData
 
 
