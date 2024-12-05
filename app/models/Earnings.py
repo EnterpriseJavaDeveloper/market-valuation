@@ -1,4 +1,4 @@
-from database import db
+from app.shared.database import db
 
 
 class Earnings(db.Model):

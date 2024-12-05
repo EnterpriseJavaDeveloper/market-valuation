@@ -15,7 +15,7 @@ from sqlalchemy import and_, func
 import logging
 
 from app.shared.caching import cache
-from database import db
+from app.shared.database import db
 from app.models.Coefficients import Coefficients
 from app.models.RegressionData import RegressionData
 

@@ -28,7 +28,7 @@ import collections
 
 from app.services.StockQuoteService import StockQuoteService
 from app.schemas.coefficients_schema import CoefficientsSchema
-from database import db
+from app.shared.database import db
 from app.shared.caching import cache
 
 # GSPC = 'GSPC'

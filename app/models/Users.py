@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from database import db
+from app.shared.database import db
 
 @dataclass
 class Users(db.Model):

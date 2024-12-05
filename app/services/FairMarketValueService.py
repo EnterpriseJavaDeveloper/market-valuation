@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 
 from app.services.MarketValueService import MarketValueService
 from app.services.StockQuoteService import StockQuoteService
-from database import db
+from app.shared.database import db
 from app.models.Earnings import Earnings
 from app.models.StockValuation import StockValuation, StockEarningsModel
 from flask import current_app
