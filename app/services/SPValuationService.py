@@ -12,6 +12,8 @@ from flask_marshmallow import Marshmallow
 from dotenv import load_dotenv
 import os
 
+from sqlalchemy import func
+
 from app import SP_QUOTE, FUTURE_EARNINGS, MARKETDATA, SP_QUOTE_CALCULATED, GSPC
 from app.endpoints.AuthService import AuthService
 from app.models.Earnings import Earnings
@@ -172,8 +174,8 @@ def get_historical_data(symbol=None):
             earnings = Earnings.query.filter(Earnings.event_time > last_date).all()
 
             # Filter earnings to ensure event_time month is greater than last_date month
-            earnings = [e for e in earnings if e.event_time.month > last_date.month]
-
+            earnings = [e for e in earnings if (e.event_time.year > last_date.year) or (
+                        e.event_time.year == last_date.year and e.event_time.month > last_date.month)]
             # Group by month and year, and get the last row of each group
             from itertools import groupby
             from operator import attrgetter
@@ -203,7 +205,7 @@ def get_historical_data(symbol=None):
 @app.route('/earnings/<symbol>')
 @cross_origin()
 def get_earnings(symbol=None):
-    all_earnings = Earnings.query.all()
+    all_earnings = Earnings.query.filter(Earnings.event_time.isnot(None)).distinct(func.date(Earnings.event_time)).all()
     results = earnings_schema.dumps(all_earnings)
     return results
 
