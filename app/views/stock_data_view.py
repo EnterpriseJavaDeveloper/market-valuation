@@ -16,7 +16,7 @@ class StockDataView(MethodView):
     def get(self):
         dictionary = collections.OrderedDict()
         dictionary['stock_valuation'] = FairMarketValueService.calculate_fair_market_value()
-        dictionary['market_data'] = MarketValueService.download_market_values()
+        dictionary['market_data'] = MarketValueService.download_market_values().to_dict()
         json_output = coefficients_schema.dump(ShillerDataService.initialize_shiller_data().get('coefficients'))
         dictionary['equation_coefficients'] = json_output
         dictionary['timestamp'] = datetime.now().strftime("%m/%d/%Y, %H:%M:%S")
